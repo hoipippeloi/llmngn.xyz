@@ -70,6 +70,26 @@ export class LanceDBClient {
     await this.table.add([row])
   }
 
+  private mapRecord(r: Record<string, unknown>): ContextRecord {
+    const expiresAt = r['expires_at'] as number | undefined
+    const createdAtVal = r['created_at'] as number | undefined
+    
+    return {
+      id: r['id'] as string,
+      vector: r['vector'] as number[],
+      projectId: r['project_id'] as string,
+      contextType: r['context_type'] as ContextType,
+      content: r['content'] as string,
+      metadata: JSON.parse(r['metadata'] as string || '{}'),
+      sessionId: r['session_id'] as string,
+      createdAt: createdAtVal ? new Date(createdAtVal).toISOString() : new Date().toISOString(),
+      expiresAt: expiresAt && expiresAt < Date.now() + 300 * 24 * 60 * 60 * 1000 
+        ? new Date(expiresAt).toISOString() 
+        : undefined,
+      salience: (r['salience'] as number) ?? 1.0
+    }
+  }
+
   async query(
     queryVector: number[],
     options: { limit?: number; projectId?: string; types?: ContextType[]; since?: string } = {}
@@ -90,22 +110,7 @@ export class LanceDBClient {
     
     return results
       .filter((row: unknown) => (row as Record<string, unknown>)['id'] !== '__init__')
-      .map((row: unknown) => {
-        const r = row as Record<string, unknown>
-        const expiresAt = r['expires_at'] as number
-        return {
-          id: r['id'] as string,
-          vector: r['vector'] as number[],
-          projectId: r['project_id'] as string,
-          contextType: r['context_type'] as ContextType,
-          content: r['content'] as string,
-          metadata: JSON.parse(r['metadata'] as string),
-          sessionId: r['session_id'] as string,
-          createdAt: new Date(r['created_at'] as number).toISOString(),
-          expiresAt: expiresAt > Date.now() + 300 * 24 * 60 * 60 * 1000 ? undefined : new Date(expiresAt).toISOString(),
-          salience: r['salience'] as number
-        }
-      })
+      .map((row: unknown) => this.mapRecord(row as Record<string, unknown>))
   }
 
   private async hasOnlyInitRecord(): Promise<boolean> {
@@ -151,19 +156,7 @@ export class LanceDBClient {
     const r = results[0] as Record<string, unknown>
     if (r['id'] === '__init__') return null
 
-    const expiresAt = r['expires_at'] as number
-    return {
-      id: r['id'] as string,
-      vector: r['vector'] as number[],
-      projectId: r['project_id'] as string,
-      contextType: r['context_type'] as ContextType,
-      content: r['content'] as string,
-      metadata: JSON.parse(r['metadata'] as string),
-      sessionId: r['session_id'] as string,
-      createdAt: new Date(r['created_at'] as number).toISOString(),
-      expiresAt: expiresAt > Date.now() + 300 * 24 * 60 * 60 * 1000 ? undefined : new Date(expiresAt).toISOString(),
-      salience: r['salience'] as number
-    }
+    return this.mapRecord(r)
   }
 
   async deleteById(id: string): Promise<boolean> {
@@ -201,22 +194,7 @@ export class LanceDBClient {
 
     return results
       .filter((row: unknown) => (row as Record<string, unknown>)['id'] !== '__init__')
-      .map((row: unknown) => {
-        const r = row as Record<string, unknown>
-        const expiresAt = r['expires_at'] as number
-        return {
-          id: r['id'] as string,
-          vector: r['vector'] as number[],
-          projectId: r['project_id'] as string,
-          contextType: r['context_type'] as ContextType,
-          content: r['content'] as string,
-          metadata: JSON.parse(r['metadata'] as string),
-          sessionId: r['session_id'] as string,
-          createdAt: new Date(r['created_at'] as number).toISOString(),
-          expiresAt: expiresAt > Date.now() + 300 * 24 * 60 * 60 * 1000 ? undefined : new Date(expiresAt).toISOString(),
-          salience: r['salience'] as number
-        }
-      })
+      .map((row: unknown) => this.mapRecord(row as Record<string, unknown>))
   }
 
   async getStats(): Promise<DBStats> {

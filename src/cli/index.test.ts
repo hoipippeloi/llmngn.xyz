@@ -6,6 +6,7 @@ import { tmpdir } from 'os'
 
 const mocks = vi.hoisted(() => ({
   query: vi.fn().mockResolvedValue([]),
+  list: vi.fn().mockResolvedValue([]),
   getStats: vi.fn().mockResolvedValue({ recordCount: 0, sizeBytes: 0 }),
   insert: vi.fn().mockResolvedValue(undefined),
   close: vi.fn().mockResolvedValue(undefined),
@@ -17,6 +18,7 @@ vi.mock('../database/client.js', () => ({
   LanceDBClient: vi.fn().mockImplementation(() => ({
     initialize: mocks.initialize,
     query: mocks.query,
+    list: mocks.list,
     getStats: mocks.getStats,
     insert: mocks.insert,
     close: mocks.close

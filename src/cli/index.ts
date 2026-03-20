@@ -213,7 +213,7 @@ This plugin maintains semantic continuity across coding sessions by storing and 
   async history(options: HistoryOptions): Promise<Array<{ sessionId: string; timestamp: string; summary: string }>> {
     const { db } = await this.initialize()
     
-    const allRecords = await db.query(new Array(768).fill(0), { limit: 1000 })
+    const allRecords = await db.list({ limit: 1000 })
     
     const sessionMap = new Map<string, { count: number; timestamps: string[] }>()
     
@@ -242,7 +242,7 @@ This plugin maintains semantic continuity across coding sessions by storing and 
   async export(options: ExportOptions): Promise<void> {
     const { db } = await this.initialize()
     
-    const allRecords = await db.query(new Array(768).fill(0), { limit: 10000 })
+    const allRecords = await db.list({ limit: 10000 })
     
     const exportData = {
       exportedAt: new Date().toISOString(),
@@ -290,12 +290,13 @@ This plugin maintains semantic continuity across coding sessions by storing and 
     const { db } = await this.initialize()
     
     const stats = await db.getStats()
-    const allRecords = await db.query(new Array(768).fill(0), { limit: 10000 })
+    const allRecords = await db.list({ limit: 10000 })
 
     const sessions = new Set(allRecords.map(r => r.sessionId))
 
     const timestamps = allRecords
       .map(r => r.createdAt)
+      .filter(Boolean)
       .sort()
 
     return {
