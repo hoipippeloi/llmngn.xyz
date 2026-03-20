@@ -21,22 +21,24 @@ export class LanceDBClient {
     
     const tableNames = await this.db.tableNames()
     
+    // Create table with proper vector column - all fields must have non-null values for arrow infer
+    const initialRecord = {
+      id: '__init__',
+      vector: new Array(768).fill(0).map(() => Math.random() * 0.01),
+      project_id: '',
+      context_type: 'file_change',
+      content: '',
+      metadata: '{}',
+      session_id: '',
+      created_at: Date.now(),
+      expires_at: Date.now() + 365 * 24 * 60 * 60 * 1000, // 1 year from now
+      salience: 1.0
+    }
+    
     if (!tableNames.includes(this.tableName)) {
-      const initialData = [{
-        id: '',
-        vector: new Float32Array(768),
-        project_id: '',
-        context_type: 'file_change',
-        content: '',
-        metadata: '{}',
-        session_id: '',
-        created_at: Date.now(),
-        expires_at: null as number | null,
-        salience: 1.0
-      }]
-      
-      this.table = await this.db.createTable(this.tableName, initialData)
-      await this.table.delete('id = \'\'')
+      this.table = await this.db.createTable(this.tableName, [initialRecord])
+      // Delete the initial record
+      await this.table.delete("id = '__init__'")
     } else {
       this.table = await this.db.openTable(this.tableName)
     }
@@ -54,16 +56,16 @@ export class LanceDBClient {
       throw new Error('Database not initialized')
     }
 
-    const row: Record<string, unknown> = {
+    const row = {
       id: record.id,
-      vector: new Float32Array(record.vector),
+      vector: record.vector,
       project_id: record.projectId,
       context_type: record.contextType,
       content: record.content,
       metadata: JSON.stringify(record.metadata),
       session_id: record.sessionId,
       created_at: new Date(record.createdAt).getTime(),
-      expires_at: record.expiresAt ? new Date(record.expiresAt).getTime() : null,
+      expires_at: record.expiresAt ? new Date(record.expiresAt).getTime() : Date.now() + 365 * 24 * 60 * 60 * 1000,
       salience: record.salience
     }
 
@@ -85,16 +87,17 @@ export class LanceDBClient {
     
     return results.map((row: unknown) => {
       const r = row as Record<string, unknown>
+      const expiresAt = r['expires_at'] as number
       return {
         id: r['id'] as string,
-        vector: Array.from(r['vector'] as Float32Array),
+        vector: r['vector'] as number[],
         projectId: r['project_id'] as string,
         contextType: r['context_type'] as ContextType,
         content: r['content'] as string,
         metadata: JSON.parse(r['metadata'] as string),
         sessionId: r['session_id'] as string,
         createdAt: new Date(r['created_at'] as number).toISOString(),
-        expiresAt: r['expires_at'] ? new Date(r['expires_at'] as number).toISOString() : undefined,
+        expiresAt: expiresAt > Date.now() + 300 * 24 * 60 * 60 * 1000 ? undefined : new Date(expiresAt).toISOString(),
         salience: r['salience'] as number
       }
     })
@@ -107,7 +110,7 @@ export class LanceDBClient {
 
     const now = Date.now()
     const results = await this.table.query()
-      .where(`expires_at IS NOT NULL AND expires_at < ${now}`)
+      .where(`expires_at < ${now}`)
       .toArray()
     
     if (results.length === 0) {
