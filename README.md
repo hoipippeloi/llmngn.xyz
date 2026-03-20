@@ -8,6 +8,13 @@ Context persistence plugin for OpenCode that maintains semantic continuity acros
 npx degit hoipippeloi/llmngn.xyz/.opencode .opencode && cd .opencode && bun install && cd ..
 ```
 
+```powershell
+npx degit hoipippeloi/llmngn.xyz/.opencode .opencode
+cd .opencode
+bun install
+cd ..
+```
+
 This installs:
 - Plugin hooks (`.opencode/plugins/llmngn.ts`)
 - Configuration (`.opencode/plugins/llmngn.json`)

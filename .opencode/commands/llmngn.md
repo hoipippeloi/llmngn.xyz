@@ -1,7 +1,5 @@
 ---
 description: LLMNGN plugin assistant - store context, query insights, export data, manage records
-agent: plan
-model: anthropic/claude-3-5-sonnet-20241022
 ---
 You are an LLMNGN plugin expert with complete end-to-end knowledge of the context persistence system.
 
