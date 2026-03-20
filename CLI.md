@@ -15,7 +15,11 @@ cd llmngn.xyz && npm install && npm link
 |---------|-------------|
 | `llmngn init` | Initialize plugin in current project |
 | `llmngn add <content>` | Add context record manually |
+| `llmngn list` | List all records |
+| `llmngn get <id>` | Get record by ID |
 | `llmngn query <text>` | Search stored context |
+| `llmngn delete <id>` | Delete record by ID |
+| `llmngn clean` | Delete expired records |
 | `llmngn history` | View session history |
 | `llmngn stats` | Show database statistics |
 | `llmngn export -o <file>` | Export context to JSON |
@@ -24,50 +28,92 @@ cd llmngn.xyz && npm install && npm link
 | `llmngn config list` | Show all settings |
 | `llmngn config set <key> <value>` | Update setting |
 
-## add
+## Command Details
 
+### add
 ```bash
-llmngn add <content> [--type type] [--session id] [--metadata json]
+llmngn add <content> [-t type] [-s session] [-m metadata]
 ```
+- `-t, --type` - Context type: decision, file_change, command, task, debt, architecture
+- `-s, --session` - Session ID
+- `-m, --metadata` - Metadata as JSON string
 
-**Options:**
-- `-t, --type` - Context type: `decision`, `file_change`, `command`, `task`, `debt`, `architecture` (default: decision)
-- `-s, --session` - Session ID (auto-generated if not provided)
-- `-m, --metadata` - Additional metadata as JSON string
-
-## query
-
+### list
 ```bash
-llmngn query <text> [--limit n] [--types type1,type2]
+llmngn list [-l limit] [-t type] [-s session]
 ```
+- `-l, --limit` - Max results (default: 100)
+- `-t, --type` - Filter by context type
+- `-s, --session` - Filter by session ID
 
-## export/import
+### query
+```bash
+llmngn query <text> [-l limit] [-t types]
+```
+- `-l, --limit` - Max results
+- `-t, --types` - Comma-separated context types
 
+### delete
+```bash
+llmngn delete <id> [-f]
+```
+- `-f, --force` - Confirm deletion
+
+### export/import
 ```bash
 llmngn export [-o file]
 llmngn import <file>
+```
+
+### purge
+```bash
+llmngn purge --force
 ```
 
 ## Examples
 
 ```bash
 # Add a decision
-llmngn add "Use Redis for session caching" --type decision
+llmngn add "Use Redis for caching" --type decision
 
 # Add with metadata
-llmngn add "Refactored auth module" --type file_change --metadata '{"file":"src/auth.ts"}'
+llmngn add "Refactored auth" -t file_change -m '{"file":"src/auth.ts"}'
+
+# List all records
+llmngn list
+
+# List only decisions
+llmngn list --type decision --limit 20
+
+# Get specific record
+llmngn get abc123-def456
 
 # Search context
 llmngn query "authentication" --types decision --limit 10
 
-# View history
+# Delete a record
+llmngn delete abc123-def456 --force
+
+# Remove expired records
+llmngn clean
+
+# View session history
 llmngn history --sessions 5
 
-# Backup
+# Check database stats
+llmngn stats
+
+# Backup before refactor
 llmngn export -o backup.json
 
-# Clear all
+# Restore from backup
+llmngn import backup.json
+
+# Clear everything
 llmngn purge --force
+
+# Update config
+llmngn config set retentionDays 120
 ```
 
 ## Development

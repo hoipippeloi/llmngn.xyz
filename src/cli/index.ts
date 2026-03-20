@@ -238,6 +238,26 @@ export class CLI {
     }
   }
 
+  async list(options: { limit?: number; type?: ContextType; session?: string }): Promise<ContextRecord[]> {
+    const { db } = await this.initialize()
+    return db.list(options)
+  }
+
+  async get(id: string): Promise<ContextRecord | null> {
+    const { db } = await this.initialize()
+    return db.getById(id)
+  }
+
+  async delete(id: string): Promise<boolean> {
+    const { db } = await this.initialize()
+    return db.deleteById(id)
+  }
+
+  async clean(): Promise<number> {
+    const { db } = await this.initialize()
+    return db.deleteExpired()
+  }
+
   async configSet(key: string, value: string): Promise<void> {
     const config = await this.configManager.load()
     
@@ -380,6 +400,60 @@ export function createProgram(cli: CLI): Command {
     .action(async () => {
       const stats = await cli.stats()
       console.log(JSON.stringify(stats, null, 2))
+    })
+
+  program
+    .command('list')
+    .description('List all context records')
+    .option('-l, --limit <n>', 'Limit results', '100')
+    .option('-t, --type <type>', 'Filter by context type')
+    .option('-s, --session <id>', 'Filter by session ID')
+    .action(async (options) => {
+      const records = await cli.list({
+        limit: parseInt(options.limit),
+        type: options.type as ContextType,
+        session: options.session
+      })
+      console.log(JSON.stringify(records.map(r => ({
+        id: r.id,
+        type: r.contextType,
+        content: r.content.slice(0, 100),
+        session: r.sessionId,
+        created: r.createdAt
+      })), null, 2))
+    })
+
+  program
+    .command('get <id>')
+    .description('Get a specific record by ID')
+    .action(async (id) => {
+      const record = await cli.get(id)
+      if (!record) {
+        console.log(JSON.stringify({ error: 'Record not found' }, null, 2))
+        return
+      }
+      console.log(JSON.stringify(record, null, 2))
+    })
+
+  program
+    .command('delete <id>')
+    .description('Delete a specific record by ID')
+    .option('-f, --force', 'Force delete without confirmation')
+    .action(async (id, options) => {
+      if (!options.force) {
+        console.log('Use --force to confirm deletion')
+        return
+      }
+      const deleted = await cli.delete(id)
+      console.log(JSON.stringify({ deleted, id }, null, 2))
+    })
+
+  program
+    .command('clean')
+    .description('Delete expired records')
+    .action(async () => {
+      const count = await cli.clean()
+      console.log(JSON.stringify({ deleted: count }, null, 2))
     })
 
   program

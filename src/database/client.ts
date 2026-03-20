@@ -134,6 +134,91 @@ export class LanceDBClient {
     return ids.length
   }
 
+  async getById(id: string): Promise<ContextRecord | null> {
+    if (!this.table) {
+      throw new Error('Database not initialized')
+    }
+
+    const results = await this.table.query()
+      .where(`id = '${id}'`)
+      .limit(1)
+      .toArray()
+
+    if (results.length === 0) {
+      return null
+    }
+
+    const r = results[0] as Record<string, unknown>
+    if (r['id'] === '__init__') return null
+
+    const expiresAt = r['expires_at'] as number
+    return {
+      id: r['id'] as string,
+      vector: r['vector'] as number[],
+      projectId: r['project_id'] as string,
+      contextType: r['context_type'] as ContextType,
+      content: r['content'] as string,
+      metadata: JSON.parse(r['metadata'] as string),
+      sessionId: r['session_id'] as string,
+      createdAt: new Date(r['created_at'] as number).toISOString(),
+      expiresAt: expiresAt > Date.now() + 300 * 24 * 60 * 60 * 1000 ? undefined : new Date(expiresAt).toISOString(),
+      salience: r['salience'] as number
+    }
+  }
+
+  async deleteById(id: string): Promise<boolean> {
+    if (!this.table) {
+      throw new Error('Database not initialized')
+    }
+
+    const record = await this.getById(id)
+    if (!record) return false
+
+    await this.table.delete(`id = '${id}'`)
+    return true
+  }
+
+  async list(options: { limit?: number; type?: ContextType; sessionId?: string } = {}): Promise<ContextRecord[]> {
+    if (!this.table) {
+      throw new Error('Database not initialized')
+    }
+
+    const count = await this.table.countRows()
+    if (count === 0 || (count === 1 && await this.hasOnlyInitRecord())) {
+      return []
+    }
+
+    let query = this.table.query()
+
+    if (options.type) {
+      query = query.where(`context_type = '${options.type}'`) as any
+    }
+    if (options.sessionId) {
+      query = query.where(`session_id = '${options.sessionId}'`) as any
+    }
+
+    const results = await query.limit(options.limit ?? 100).toArray()
+
+    return results
+      .filter((row: unknown) => (row as Record<string, unknown>)['id'] !== '__init__')
+      .map((row: unknown) => {
+        const r = row as Record<string, unknown>
+        const expiresAt = r['expires_at'] as number
+        return {
+          id: r['id'] as string,
+          vector: r['vector'] as number[],
+          projectId: r['project_id'] as string,
+          contextType: r['context_type'] as ContextType,
+          content: r['content'] as string,
+          metadata: JSON.parse(r['metadata'] as string),
+          sessionId: r['session_id'] as string,
+          createdAt: new Date(r['created_at'] as number).toISOString(),
+          expiresAt: expiresAt > Date.now() + 300 * 24 * 60 * 60 * 1000 ? undefined : new Date(expiresAt).toISOString(),
+          salience: r['salience'] as number
+        }
+      })
+  }
+
   async getStats(): Promise<DBStats> {
     if (!this.table) {
       throw new Error('Database not initialized')
