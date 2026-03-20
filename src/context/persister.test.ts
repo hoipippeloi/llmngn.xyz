@@ -98,7 +98,7 @@ describe('ContextPersister', () => {
         endTime: new Date().toISOString(),
         changes: [
           { filePath: '/src/app.ts', changeType: 'create', diffSummary: 'Created', linesAdded: 10, linesRemoved: 0, relatedTasks: [] },
-          { filePath: '/node_modules/lib/index.js', changeType: 'create', diffSummary: 'Should exclude', linesAdded: 10, linesRemoved: 0, relatedTasks: [] }
+          { filePath: '/project/node_modules/lib/index.js', changeType: 'create', diffSummary: 'Should exclude', linesAdded: 10, linesRemoved: 0, relatedTasks: [] }
         ],
         decisions: [],
         tasks: [],
@@ -111,7 +111,9 @@ describe('ContextPersister', () => {
       const insertCalls = vi.mocked(mockDb.insert).mock.calls
       const persistedPaths = insertCalls.map(call => (call[0] as any).metadata?.filePath).filter(Boolean)
 
-      expect(persistedPaths.some((p: string) => p.includes('node_modules'))).toBe(false)
+      expect(persistedPaths).toContain('/src/app.ts')
+      expect(persistedPaths).not.toContain('/project/node_modules/lib/index.js')
+      expect(persistedPaths.length).toBe(1)
     })
   })
 

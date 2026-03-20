@@ -10,7 +10,7 @@ describe('ConfigManager', () => {
   let testDir: string
 
   beforeEach(async () => {
-    testDir = join(tmpdir(), `config-test-${Date.now()}`)
+    testDir = join(tmpdir(), `llmngn-test-${Date.now()}`)
     await mkdir(testDir, { recursive: true })
     configManager = new ConfigManager(testDir)
   })
@@ -27,8 +27,9 @@ describe('ConfigManager', () => {
         embeddingProvider: 'local'
       }
       
+      await mkdir(join(testDir, '.opencode', 'plugins'), { recursive: true })
       await writeFile(
-        join(testDir, '.opencode', 'plugins', 'context-persistence.json'),
+        join(testDir, '.opencode', 'plugins', 'llmngn.json'),
         JSON.stringify(config)
       )
 
@@ -47,8 +48,9 @@ describe('ConfigManager', () => {
     })
 
     it('should merge user config with defaults', async () => {
+      await mkdir(join(testDir, '.opencode', 'plugins'), { recursive: true })
       await writeFile(
-        join(testDir, '.opencode', 'plugins', 'context-persistence.json'),
+        join(testDir, '.opencode', 'plugins', 'llmngn.json'),
         JSON.stringify({ maxContextTokens: 8192 })
       )
 

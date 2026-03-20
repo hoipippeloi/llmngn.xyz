@@ -1,17 +1,40 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { CLI } from './index.js'
-import { mkdir, rm } from 'fs/promises'
+import { mkdir, writeFile, rm } from 'fs/promises'
 import { join } from 'path'
 import { tmpdir } from 'os'
 
-vi.mock('../database/client.js')
-vi.mock('../embedding/embedding.js')
+const mocks = vi.hoisted(() => ({
+  query: vi.fn().mockResolvedValue([]),
+  getStats: vi.fn().mockResolvedValue({ recordCount: 0, sizeBytes: 0 }),
+  insert: vi.fn().mockResolvedValue(undefined),
+  close: vi.fn().mockResolvedValue(undefined),
+  initialize: vi.fn().mockResolvedValue(undefined),
+  encode: vi.fn().mockResolvedValue({ vector: new Array(768).fill(0) })
+}))
+
+vi.mock('../database/client.js', () => ({
+  LanceDBClient: vi.fn().mockImplementation(() => ({
+    initialize: mocks.initialize,
+    query: mocks.query,
+    getStats: mocks.getStats,
+    insert: mocks.insert,
+    close: mocks.close
+  }))
+}))
+
+vi.mock('../embedding/embedding.js', () => ({
+  createEmbeddingProvider: vi.fn().mockReturnValue({
+    encode: mocks.encode
+  })
+}))
 
 describe('CLI', () => {
   let cli: CLI
   let testDir: string
 
   beforeEach(async () => {
+    vi.clearAllMocks()
     testDir = join(tmpdir(), `cli-test-${Date.now()}`)
     await mkdir(testDir, { recursive: true })
     cli = new CLI(testDir)
@@ -43,6 +66,7 @@ describe('CLI', () => {
       
       const results = await cli.query({ text: 'auth module', limit: 10 })
       expect(Array.isArray(results)).toBe(true)
+      expect(mocks.query).toHaveBeenCalled()
     })
 
     it('should filter by context type', async () => {
@@ -50,8 +74,8 @@ describe('CLI', () => {
       
       const results = await cli.query({
         text: 'test',
-        limit: Number(10),
-        types: ['file_change', 'decision'] as any
+        limit: 10,
+        types: ['file_change', 'decision']
       })
       expect(Array.isArray(results)).toBe(true)
     })
@@ -72,22 +96,50 @@ describe('CLI', () => {
       
       const outputPath = join(testDir, 'export.json')
       await cli.export({ output: outputPath })
-      
     })
+  })
 
+  describe('import', () => {
     it('should import context from file', async () => {
       await cli.init({})
       
       const importPath = join(testDir, 'import.json')
-      await expect(cli.import({ path: importPath })).resolves.not.toThrow()
+      const importData = {
+        exportedAt: new Date().toISOString(),
+        project: testDir,
+        recordCount: 1,
+        records: [{
+          id: 'test-id',
+          vector: new Array(768).fill(0),
+          projectId: 'test',
+          contextType: 'file_change',
+          content: 'test content',
+          metadata: {},
+          sessionId: 'session-1',
+          createdAt: new Date().toISOString(),
+          salience: 1.0
+        }]
+      }
+      
+      await writeFile(importPath, JSON.stringify(importData))
+      await cli.import({ path: importPath })
+      
+      expect(mocks.insert).toHaveBeenCalled()
     })
   })
 
   describe('purge', () => {
-    it('should clear database', async () => {
+    it('should require force flag', async () => {
+      await cli.init({})
+      
+      await expect(cli.purge({})).rejects.toThrow('Purge requires --force')
+    })
+
+    it('should clear database with force', async () => {
       await cli.init({})
       
       await cli.purge({ force: true })
+      expect(mocks.close).toHaveBeenCalled()
     })
   })
 

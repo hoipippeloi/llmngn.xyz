@@ -10,7 +10,7 @@ export class LanceDBClient {
   private db: lancedb.Connection | null = null
   private table: lancedb.Table | null = null
   private readonly dbPath: string
-  private readonly tableName = 'codebase_context'
+  private readonly tableName = 'llmngn_context'
 
   constructor(dbPath: string) {
     this.dbPath = dbPath
@@ -37,8 +37,6 @@ export class LanceDBClient {
     
     if (!tableNames.includes(this.tableName)) {
       this.table = await this.db.createTable(this.tableName, [initialRecord])
-      // Delete the initial record
-      await this.table.delete("id = '__init__'")
     } else {
       this.table = await this.db.openTable(this.tableName)
     }
@@ -80,27 +78,40 @@ export class LanceDBClient {
       throw new Error('Database not initialized')
     }
 
+    const count = await this.table.countRows()
+    if (count === 0 || (count === 1 && await this.hasOnlyInitRecord())) {
+      return []
+    }
+
     const query = this.table.vectorSearch(new Float32Array(queryVector))
       .limit(options.limit ?? 50)
 
     const results = await query.toArray()
     
-    return results.map((row: unknown) => {
-      const r = row as Record<string, unknown>
-      const expiresAt = r['expires_at'] as number
-      return {
-        id: r['id'] as string,
-        vector: r['vector'] as number[],
-        projectId: r['project_id'] as string,
-        contextType: r['context_type'] as ContextType,
-        content: r['content'] as string,
-        metadata: JSON.parse(r['metadata'] as string),
-        sessionId: r['session_id'] as string,
-        createdAt: new Date(r['created_at'] as number).toISOString(),
-        expiresAt: expiresAt > Date.now() + 300 * 24 * 60 * 60 * 1000 ? undefined : new Date(expiresAt).toISOString(),
-        salience: r['salience'] as number
-      }
-    })
+    return results
+      .filter((row: unknown) => (row as Record<string, unknown>)['id'] !== '__init__')
+      .map((row: unknown) => {
+        const r = row as Record<string, unknown>
+        const expiresAt = r['expires_at'] as number
+        return {
+          id: r['id'] as string,
+          vector: r['vector'] as number[],
+          projectId: r['project_id'] as string,
+          contextType: r['context_type'] as ContextType,
+          content: r['content'] as string,
+          metadata: JSON.parse(r['metadata'] as string),
+          sessionId: r['session_id'] as string,
+          createdAt: new Date(r['created_at'] as number).toISOString(),
+          expiresAt: expiresAt > Date.now() + 300 * 24 * 60 * 60 * 1000 ? undefined : new Date(expiresAt).toISOString(),
+          salience: r['salience'] as number
+        }
+      })
+  }
+
+  private async hasOnlyInitRecord(): Promise<boolean> {
+    if (!this.table) return true
+    const results = await this.table.query().limit(1).toArray()
+    return results.length === 1 && (results[0] as Record<string, unknown>)['id'] === '__init__'
   }
 
   async deleteExpired(): Promise<number> {
@@ -128,7 +139,10 @@ export class LanceDBClient {
       throw new Error('Database not initialized')
     }
 
-    const count = await this.table.countRows()
+    let count = await this.table.countRows()
+    if (count > 0 && await this.hasOnlyInitRecord()) {
+      count = 0
+    }
     
     return {
       recordCount: count,

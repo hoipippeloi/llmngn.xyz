@@ -214,7 +214,12 @@ export class ContextPersister {
 
   private shouldExclude(filePath: string): boolean {
     for (const pattern of this.config.filters.excludePatterns) {
-      const regex = new RegExp(pattern.replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*'))
+      let regexPattern = pattern
+        .replace(/\*\*/g, '«DOUBLESTAR»')
+        .replace(/\*/g, '[^/]*')
+        .replace(/«DOUBLESTAR»/g, '.*')
+      
+      const regex = new RegExp(regexPattern, 'i')
       if (regex.test(filePath)) {
         return true
       }

@@ -33,7 +33,7 @@ const DEFAULT_CONFIG: PluginConfig = {
   }
 }
 
-const CONFIG_FILE = 'context-persistence.json'
+const CONFIG_FILE = 'llmngn.json'
 
 export class ConfigManager {
   private projectDir: string

@@ -1,6 +1,6 @@
 {
-  "project": "context-persistence-plugin",
-  "spec": ".specs/context-persistence-plugin/spec.md",
+  "project": "llmngn",
+  "spec": ".specs/llmngn-plugin/spec.md",
   "developmentMethodology": "TDD (RED-GREEN-REFACTOR cycle)",
   "tasks": [
     {
@@ -203,7 +203,7 @@
       "id": "cli-001",
       "phase": "CLI",
       "title": "Implement init command",
-      "description": "CLI: context-persist init [--embedding-model <model>] - Initialize plugin in current project",
+      "description": "CLI: llmngn init [--embedding-model <model>] - Initialize plugin in current project",
       "acceptanceCriteria": [
         "TDD: Write test for init command before implementation",
         "TDD: Test fails when command does not create config",
@@ -217,7 +217,7 @@
       "id": "cli-002",
       "phase": "CLI",
       "title": "Implement query command",
-      "description": "CLI: context-persist query <text> [--limit <n>] [--type <type>] - Query stored context",
+      "description": "CLI: llmngn query <text> [--limit <n>] [--type <type>] - Query stored context",
       "acceptanceCriteria": [
         "TDD: Write test for query command before implementation",
         "TDD: Test fails when query returns no results",
@@ -231,7 +231,7 @@
       "id": "cli-003",
       "phase": "CLI",
       "title": "Implement history command",
-      "description": "CLI: context-persist history [--sessions <n>] - Show session history",
+      "description": "CLI: llmngn history [--sessions <n>] - Show session history",
       "acceptanceCriteria": [
         "TDD: Write test for history command before implementation",
         "TDD: Test fails when history is not displayed",
@@ -245,7 +245,7 @@
       "id": "cli-004",
       "phase": "CLI",
       "title": "Implement export/import commands",
-      "description": "CLI: context-persist export [--output <path>] and import <path> - Backup and restore context",
+      "description": "CLI: llmngn export [--output <path>] and import <path> - Backup and restore context",
       "acceptanceCriteria": [
         "TDD: Write test for export/import before implementation",
         "TDD: Test fails when data is not exported/imported correctly",
@@ -259,7 +259,7 @@
       "id": "cli-005",
       "phase": "CLI",
       "title": "Implement purge command",
-      "description": "CLI: context-persist purge [--force] - Clear stored context",
+      "description": "CLI: llmngn purge [--force] - Clear stored context",
       "acceptanceCriteria": [
         "TDD: Write test for purge command before implementation",
         "TDD: Test fails when database is not cleared",
@@ -273,7 +273,7 @@
       "id": "cli-006",
       "phase": "CLI",
       "title": "Implement stats command",
-      "description": "CLI: context-persist stats - Show database statistics",
+      "description": "CLI: llmngn stats - Show database statistics",
       "acceptanceCriteria": [
         "TDD: Write test for stats command before implementation",
         "TDD: Test fails when statistics are not displayed",
@@ -287,7 +287,7 @@
       "id": "config-001",
       "phase": "Configuration",
       "title": "Implement configuration file parser",
-      "description": "Parse and validate .opencode/plugins/context-persistence.json configuration",
+      "description": "Parse and validate .opencode/plugins/llmngn.json configuration",
       "acceptanceCriteria": [
         "TDD: Write test for config parsing before implementation",
         "TDD: Test fails when invalid config is not rejected",
@@ -301,7 +301,7 @@
       "id": "config-002",
       "phase": "Configuration",
       "title": "Implement CLI config subcommands",
-      "description": "CLI: context-persist config set/get/list - Manage configuration",
+      "description": "CLI: llmngn config set/get/list - Manage configuration",
       "acceptanceCriteria": [
         "TDD: Write test for config commands before implementation",
         "TDD: Test fails when config is not updated",

@@ -4,9 +4,9 @@
   "embeddingProvider": "local",
   "lancedbPath": ".lancedb",
   "maxContextTokens": 4096,
+  "queryLatencyMs": 500,
   "salienceDecay": 0.95,
-  "retentionDays": 90,
-  "debug": true,
+  "retentionDays": 120,
   "contextTypes": [
     "file_change",
     "decision",
@@ -34,5 +34,6 @@
       "**/package-lock.json"
     ],
     "sensitiveDataRedaction": true
-  }
+  },
+  "debug": true
 }

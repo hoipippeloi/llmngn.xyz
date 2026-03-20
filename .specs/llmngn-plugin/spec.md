@@ -1,8 +1,8 @@
-# Context Persistence Plugin Technical Specification
+# LLMNGN Technical Specification
 
 ## Executive Summary
 
-The Context Persistence Plugin enables LLMs to maintain semantic continuity across coding sessions by persisting and retrieving codebase context through a vector database. This system captures development decisions, code changes, architectural knowledge, and task progress during sessions, then injects relevant context when new sessions begin. The plugin integrates with OpenCode.ai's plugin architecture using session lifecycle hooks, stores embeddings in LanceDB, and provides a CLI interface for configuration and management.
+LLMNGN enables LLMs to maintain semantic continuity across coding sessions by persisting and retrieving codebase context through a vector database. This system captures development decisions, code changes, architectural knowledge, and task progress during sessions, then injects relevant context when new sessions begin. The plugin integrates with OpenCode.ai's plugin architecture using session lifecycle hooks, stores embeddings in LanceDB, and provides a CLI interface for configuration and management.
 
 ---
 
@@ -17,7 +17,7 @@ graph TB
         Hooks[Plugin Hooks]
     end
     
-    subgraph "Context Persistence Plugin"
+    subgraph "LLMNGN Plugin"
         CLI[CLI Application<br/>Crust Framework]
         PreHook[Pre-Session Hook]
         PostHook[Post-Session Hook]
@@ -64,7 +64,7 @@ Project Root/
 ├── .lancedb/                    # Vector database (per-project)
 ├── .opencode/
 │   └── plugins/
-│       └── context-persistence/
+│       └── llmngn/
 │           ├── config.json      # Plugin configuration
 │           └── cache/           # Local embedding cache
 ├── node_modules/
@@ -77,7 +77,7 @@ Project Root/
 
 ### 2.1 LanceDB Collection Structure
 
-**Collection Name:** `codebase_context`
+**Collection Name:** `llmngn_context`
 
 | Field | Type | Indexed | Description |
 |-------|------|---------|-------------|
@@ -174,7 +174,7 @@ This provides basic semantic similarity without external API dependencies. Futur
 ```python
 # LanceDB table creation
 table = db.create_table(
-    "codebase_context",
+    "llmngn_context",
     schema=schema,
     mode="overwrite"
 )
@@ -202,30 +202,30 @@ table.create_index("created_at")
 
 ```bash
 # Initialize plugin in current project
-context-persist init [--embedding-model <model>]
+llmngn init [--embedding-model <model>]
 
 # Query stored context
-context-persist query <text> [--limit <n>] [--type <type>]
+llmngn query <text> [--limit <n>] [--type <type>]
 
 # Show session history
-context-persist history [--sessions <n>]
+llmngn history [--sessions <n>]
 
 # Export context for backup
-context-persist export [--output <path>]
+llmngn export [--output <path>]
 
 # Import context from backup
-context-persist import <path>
+llmngn import <path>
 
 # Clear stored context
-context-persist purge [--force]
+llmngn purge [--force]
 
 # Show database statistics
-context-persist stats
+llmngn stats
 
 # Configure plugin
-context-persist config set <key> <value>
-context-persist config get <key>
-context-persist config list
+llmngn config set <key> <value>
+llmngn config get <key>
+llmngn config list
 ```
 
 ### 3.2 Plugin Hook Interface
@@ -292,7 +292,7 @@ export const ContextPersistencePlugin = async ({ client, directory }) => {
 
 ### 3.3 Configuration File Format
 
-**Location:** `.opencode/plugins/context-persistence.json`
+**Location:** `.opencode/plugins/llmngn.json`
 
 ```json
 {
@@ -336,7 +336,7 @@ export const ContextPersistencePlugin = async ({ client, directory }) => {
 ```
 
 **Key Settings:**
-- `debug`: Enable verbose logging to `.opencode/plugins/context-persistence-debug.log`
+- `debug`: Enable verbose logging to `.opencode/plugins/llmngn-debug.log`
 - `lancedbPath`: Relative path from project root for database storage
 - `weights`: Importance multipliers for different context types
 - `filters.excludePatterns`: Glob patterns for files to skip
@@ -472,7 +472,7 @@ def calculate_priority(record, query_vector):
 ```typescript
 // Primary query: filter by projectId
 async function queryRelevantContext(db, projectId, options) {
-  const table = await db.openTable('codebase_context')
+  const table = await db.openTable('llmngn_context')
   const results = await table.query()
     .limit(options.limit || 50)
     .toArray()
@@ -606,14 +606,14 @@ async function handleEmbeddingFailure(record, embedder, cache) {
 
 **User Isolation:**
 - Database stored in project directory by default
-- Per-user configuration in `.opencode/plugins/context-persistence.json`
+- Per-user configuration in `.opencode/plugins/llmngn.json`
 
 ### 8.2 Access Controls
 
 ```typescript
 // File permissions (Unix)
 chmod 700 .lancedb/
-chmod 600 .opencode/plugins/context-persistence.json
+chmod 600 .opencode/plugins/llmngn.json
 
 // Programmatic access check
 function verifyProjectAccess(projectPath, userId) {
@@ -710,13 +710,13 @@ function redactSensitiveData(content: string): string {
 
 ```bash
 # Initialize for existing project
-context-persist init --warmup-sessions 5
+llmngn init --warmup-sessions 5
 
 # Import context from another project
-context-persist import --source ../other-project/.lancedb
+llmngn import --source ../other-project/.lancedb
 
 # Dry-run: show what would be injected
-context-persist query --dry-run --intent "refactor auth module"
+llmngn query --dry-run --intent "refactor auth module"
 ```
 
 ---
@@ -886,24 +886,24 @@ describe('ContextPersistencePlugin', () => {
 
 ```bash
 # Check database health
-context-persist stats --verbose
+llmngn stats --verbose
 
 # Test embedding connectivity
-context-persist config test-embedding
+llmngn config test-embedding
 
 # View recent context
-context-persist query "recent changes" --limit 10
+llmngn query "recent changes" --limit 10
 
 # Export debug logs
-context-persist logs --output debug.log
+llmngn logs --output debug.log
 ```
 
 ### 15.3 Support Escalation
 
-1. Check debug logs: `.opencode/plugins/context-persistence-debug.log`
-2. Verify LanceDB exists: `.lancedb/codebase_context.lance/`
-3. Check configuration: `.opencode/plugins/context-persistence.json`
-4. File issue: https://github.com/llmngn.xyz/context-persistence-plugin/issues
+1. Check debug logs: `.opencode/plugins/llmngn-debug.log`
+2. Verify LanceDB exists: `.lancedb/llmngn_context.lance/`
+3. Check configuration: `.opencode/plugins/llmngn.json`
+4. File issue: https://github.com/github.com/hoipippeloi/llmngn.xyz/issues
 
 **Debug Mode:**
 Set `"debug": true` in config to enable verbose logging to the debug log file. This captures:
@@ -964,7 +964,7 @@ The current implementation differs from the original spec in several ways:
 - Portable across different mount points
 
 **Debug Logging:**
-- Logs written to `.opencode/plugins/context-persistence-debug.log`
+- Logs written to `.opencode/plugins/llmngn-debug.log`
 - Enables troubleshooting of hook firing and data flow
 
 ---

@@ -1,6 +1,6 @@
-# Context Persistence Plugin
+# LLMNGN
 
-A self-contained OpenCode plugin that maintains semantic continuity across coding sessions by persisting and retrieving codebase context through LanceDB.
+Context persistence plugin for OpenCode that maintains semantic continuity across coding sessions using LanceDB.
 
 ## Features
 
@@ -27,11 +27,13 @@ cd .opencode && npm install && cd ..
 
 ### 2. Configure (Optional)
 
-Edit `.opencode/plugins/context-persistence.json`:
+Edit `.opencode/plugins/llmngn.json`:
 
 ```json
 {
   "enabled": true,
+  "embeddingModel": "nomic-embed-text",
+  "embeddingProvider": "local",
   "lancedbPath": ".lancedb",
   "maxContextTokens": 4096,
   "salienceDecay": 0.95,
@@ -55,6 +57,10 @@ Edit `.opencode/plugins/context-persistence.json`:
 
 Start OpenCode in the project directory. The plugin auto-loads and persists context automatically.
 
+### 4. CLI
+
+Use `llmngn` CLI to manage the database. See [CLI.md](./CLI.md) for commands.
+
 ## How It Works
 
 ```
@@ -73,10 +79,10 @@ Start OpenCode in the project directory. The plugin auto-loads and persists cont
 
 ```
 .opencode/
-├── package.json                        # Dependencies
+├── package.json              # Dependencies
 └── plugins/
-    ├── context-persistence.ts          # Main plugin (self-contained)
-    └── context-persistence.json         # Configuration
+    ├── llmngn.ts             # Main plugin (self-contained)
+    └── llmngn.json           # Configuration
 ```
 
 ## Context Types and Priority
@@ -105,6 +111,8 @@ Start OpenCode in the project directory. The plugin auto-loads and persists cont
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `enabled` | boolean | `true` | Enable/disable plugin |
+| `embeddingProvider` | string | `"local"` | Embedding provider: `local` (hash-based) or `cloud` |
+| `embeddingModel` | string | `"nomic-embed-text"` | Model name for embeddings |
 | `lancedbPath` | string | `".lancedb"` | Database storage path |
 | `maxContextTokens` | number | `4096` | Max tokens per injection |
 | `salienceDecay` | number | `0.95` | Weight for recent vs old |

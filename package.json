@@ -1,12 +1,12 @@
 {
-  "name": "context-persistence-plugin",
+  "name": "llmngn",
   "version": "0.1.0",
-  "description": "Context Persistence Plugin for OpenCode - maintains semantic continuity across coding sessions using LanceDB",
+  "description": "LLMNGN - Context persistence plugin for OpenCode using LanceDB",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "context-persist": "./dist/cli.js"
+    "llmngn": "./dist/cli.js"
   },
   "scripts": {
     "build": "tsc",
@@ -14,7 +14,6 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [

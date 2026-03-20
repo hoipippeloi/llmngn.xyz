@@ -6,7 +6,7 @@ import { join } from 'path'
 let testDir: string
 
 beforeAll(async () => {
-  testDir = join(tmpdir(), `context-persistence-test-${Date.now()}`)
+  testDir = join(tmpdir(), `llmngn-test-${Date.now()}`)
   await mkdir(testDir, { recursive: true })
   process.env.TEST_DIR = testDir
 })

@@ -69,7 +69,7 @@ async function debugLog(message: string, data?: any): Promise<void> {
 }
 
 async function loadConfig(directory: string): Promise<typeof DEFAULT_CONFIG> {
-  const configPath = join(directory, ".opencode", "plugins", "context-persistence.json")
+  const configPath = join(directory, ".opencode", "plugins", "llmngn.json")
   try {
     const content = await readFile(configPath, "utf-8")
     const userConfig = JSON.parse(content)
@@ -138,13 +138,13 @@ async function initDatabase(dbPath: string, directory: string): Promise<any> {
 
 async function insertRecord(db: any, record: ContextRecord): Promise<void> {
   try {
-    const table = await db.openTable("codebase_context")
+    const table = await db.openTable("llmngn_context")
     await table.add([record])
     await debugLog("insertRecord: added to existing table", { id: record.id, type: record.contextType })
   } catch (e) {
     await debugLog("insertRecord: openTable failed, trying createTable", { error: String(e) })
     try {
-      await db.createTable("codebase_context", [
+      await db.createTable("llmngn_context", [
         {
           id: "init",
           vector: Array(128).fill(0),
@@ -159,7 +159,7 @@ async function insertRecord(db: any, record: ContextRecord): Promise<void> {
         }
       ])
       await debugLog("insertRecord: created new table, now adding record")
-      const table2 = await db.openTable("codebase_context")
+      const table2 = await db.openTable("llmngn_context")
       await table2.add([record])
       await debugLog("insertRecord: added to new table", { id: record.id, type: record.contextType })
     } catch (createErr) {
@@ -171,7 +171,7 @@ async function insertRecord(db: any, record: ContextRecord): Promise<void> {
 async function queryRecords(db: any, limit: number, projectId: string): Promise<ContextRecord[]> {
   await debugLog("queryRecords: starting", { limit, projectId })
   try {
-    const table = await db.openTable("codebase_context")
+    const table = await db.openTable("llmngn_context")
     const results = await table.query().limit(limit).toArray()
     await debugLog("queryRecords: got results", { totalResults: results.length })
     const filtered = results.filter((r: any) => r.projectId === projectId)
@@ -185,7 +185,7 @@ async function queryRecords(db: any, limit: number, projectId: string): Promise<
 
 async function deleteExpired(db: any): Promise<void> {
   try {
-    const table = await db.openTable("codebase_context")
+    const table = await db.openTable("llmngn_context")
     const now = new Date().toISOString()
     await table.delete(`expiresAt < '${now}'`)
   } catch {}
@@ -234,7 +234,7 @@ async function persistContext(
 
 export default async ({ project, client, directory }: Parameters<Plugin>[0]) => {
   hookCalls = []
-  debugLogPath = join(directory, ".opencode", "plugins", "context-persistence-debug.log")
+  debugLogPath = join(directory, ".opencode", "plugins", "llmngn-debug.log")
   
   await writeFile(debugLogPath, `=== NEW SESSION ${new Date().toISOString()} ===\n`)
   await debugLog("Plugin initialized", { directory })
@@ -246,7 +246,7 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
     await debugLog("Plugin DISABLED by config")
     return {
       "experimental.chat.system.transform": async (_input: any, output: any) => {
-        output.system.push(`[Context Persistence] DISABLED by config`)
+        output.system.push(`[LLMNGN] DISABLED by config`)
       }
     }
   }
@@ -262,7 +262,7 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
       await debugLog("Database FAILED to initialize - returning empty hooks")
       return {
         "experimental.chat.system.transform": async (_input: any, output: any) => {
-          output.system.push(`[Context Persistence] LanceDB not available - check debug log at .opencode/plugins/context-persistence-debug.log`)
+          output.system.push(`[LLMNGN] LanceDB not available - check debug log at .opencode/plugins/llmngn-debug.log`)
         }
       }
     }
@@ -272,7 +272,7 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
     await debugLog("Database init threw exception", { error: String(error), stack: (error as Error).stack })
     return {
       "experimental.chat.system.transform": async (_input: any, output: any) => {
-        output.system.push(`[Context Persistence] Init error: ${error}`)
+        output.system.push(`[LLMNGN] Init error: ${error}`)
       }
     }
   }
@@ -312,7 +312,7 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
             grouped[type].push(r.content)
           }
 
-          output.system.push(`[Context from prior sessions - ${results.length} records]:`)
+          output.system.push(`[LLMNGN - ${results.length} records from prior sessions]:`)
 
           if (grouped["decision"]?.length) {
             output.system.push(`## Decisions (${grouped["decision"].length})`)
@@ -338,7 +338,7 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
         }
       } catch (error) {
         await debugLog("experimental.chat.system.transform: ERROR", { error: String(error) })
-        output.system.push(`[Context Persistence] Error: ${error}`)
+        output.system.push(`[LLMNGN] Error: ${error}`)
       }
     },
 

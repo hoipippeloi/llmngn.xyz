@@ -134,7 +134,7 @@ export class CLI {
       records: allRecords
     }
 
-    const outputPath = options.output ?? 'context-export.json'
+    const outputPath = options.output ?? 'llmngn-export.json'
     await writeFile(outputPath, JSON.stringify(exportData, null, 2))
   }
 
@@ -248,8 +248,8 @@ export function createProgram(cli: CLI): Command {
   const program = new Command()
 
   program
-    .name('context-persist')
-    .description('Context Persistence Plugin CLI')
+    .name('llmngn')
+    .description('LLMNGN - Context persistence CLI')
     .version('0.1.0')
 
   program
@@ -258,7 +258,7 @@ export function createProgram(cli: CLI): Command {
     .option('--embedding-model <model>', 'Embedding model to use')
     .action(async (options) => {
       await cli.init(options)
-      console.log('Context persistence plugin initialized')
+      console.log('LLMNGN initialized')
     })
 
   program

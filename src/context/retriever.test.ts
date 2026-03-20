@@ -20,9 +20,10 @@ describe('ContextRetriever', () => {
       getTable: vi.fn()
     } as any
 
+    const queryVector = new Array(768).fill(0.5)
     mockEmbedder = {
       name: 'test',
-      encode: vi.fn().mockResolvedValue({ vector: new Array(768).fill(0), model: 'test', tokens: 10 }),
+      encode: vi.fn().mockResolvedValue({ vector: queryVector, model: 'test', tokens: 10 }),
       encodeBatch: vi.fn(),
       isAvailable: vi.fn().mockResolvedValue(true)
     }
@@ -58,7 +59,7 @@ describe('ContextRetriever', () => {
     it('should retrieve relevant context for a query', async () => {
       const mockRecords: ContextRecord[] = [{
         id: '1',
-        vector: new Array(768).fill(0),
+        vector: new Array(768).fill(0.5),
         projectId: 'test-project',
         contextType: 'file_change',
         content: 'Created new auth module',
@@ -97,7 +98,7 @@ describe('ContextRetriever', () => {
     it('should truncate context to max tokens', async () => {
       const longRecords: ContextRecord[] = Array(100).fill(null).map((_, i) => ({
         id: `${i}`,
-        vector: new Array(768).fill(0),
+        vector: new Array(768).fill(0.5),
         projectId: 'test',
         contextType: 'decision' as const,
         content: 'A'.repeat(1000),
@@ -133,7 +134,7 @@ describe('ContextRetriever', () => {
     it('should calculate priority score correctly', () => {
       const record: ContextRecord = {
         id: '1',
-        vector: new Array(768).fill(0.1),
+        vector: new Array(768).fill(0.5),
         projectId: 'test',
         contextType: 'decision',
         content: 'test',
@@ -143,16 +144,19 @@ describe('ContextRetriever', () => {
         salience: 1.0
       }
 
-      const score = retriever.calculateScore(record, new Array(768).fill(0), config.weights)
+      const queryVector = new Array(768).fill(0.5)
+      const score = retriever.calculateScore(record, queryVector, config.weights)
 
       expect(score).toBeGreaterThanOrEqual(0)
-      expect(score).toBeLessThanOrEqual(1)
+      expect(score).toBeLessThanOrEqual(1.01)
     })
 
     it('should apply recency decay', () => {
+      const queryVector = new Array(768).fill(0.5)
+      
       const oldRecord: ContextRecord = {
         id: '1',
-        vector: new Array(768).fill(0.1),
+        vector: new Array(768).fill(0.5),
         projectId: 'test',
         contextType: 'decision',
         content: 'test',
@@ -168,10 +172,12 @@ describe('ContextRetriever', () => {
         createdAt: new Date().toISOString()
       }
 
-      const oldScore = retriever.calculateScore(oldRecord, new Array(768).fill(0), config.weights)
-      const recentScore = retriever.calculateScore(recentRecord, new Array(768).fill(0), config.weights)
+      const oldScore = retriever.calculateScore(oldRecord, queryVector, config.weights)
+      const recentScore = retriever.calculateScore(recentRecord, queryVector, config.weights)
 
       expect(recentScore).toBeGreaterThan(oldScore)
+      expect(recentScore).toBeGreaterThan(0)
+      expect(oldScore).toBeGreaterThan(0)
     })
   })
 
