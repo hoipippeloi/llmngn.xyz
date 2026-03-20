@@ -10,7 +10,8 @@ const BRANCH = 'main'
 const FILES = [
   '.opencode/plugins/llmngn.ts',
   '.opencode/plugins/llmngn.json',
-  '.opencode/package.json'
+  '.opencode/package.json',
+  '.opencode/commands/llmngn.md'
 ]
 
 async function downloadFile(url, dest) {

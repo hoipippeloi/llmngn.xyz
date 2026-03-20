@@ -2,6 +2,28 @@
 
 CLI for managing the LLMNGN context database.
 
+## Interactive Command
+
+Use `/llmngn` in OpenCode for natural language interaction:
+
+```
+/llmngn <your intent>
+```
+
+| Example Prompt | Action |
+|----------------|--------|
+| "store that we decided to use Redis" | `llmngn add` decision |
+| "show me my latest records" | `llmngn list` |
+| "find anything about auth" | `llmngn query` |
+| "export my data" | `llmngn export` |
+| "what's in my database?" | `llmngn stats` |
+| "show session history" | `llmngn history` |
+| "delete record abc123" | `llmngn delete` |
+| "clean up expired" | `llmngn clean` |
+| "analyze my patterns" | Query + summarize |
+
+The command file is located at `.opencode/commands/llmngn.md` and is installed automatically.
+
 ## Installation
 
 ```bash

@@ -14,6 +14,19 @@ npx degit hoipippeloi/llmngn.xyz/.opencode .opencode && cd .opencode && bun inst
 
 Start OpenCode in your project. The plugin auto-loads - no additional setup required.
 
+## Interactive Command
+
+The `/llmngn` command is installed automatically in `.opencode/commands/llmngn.md`.
+
+Use it in OpenCode for natural language interaction:
+
+```
+/llmngn store this decision
+/llmngn show me recent changes
+/llmngn find anything about auth
+/llmngn export my data
+```
+
 ## CLI Installation
 
 For the `llmngn` CLI commands:

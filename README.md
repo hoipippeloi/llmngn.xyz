@@ -8,6 +8,11 @@ Context persistence plugin for OpenCode that maintains semantic continuity acros
 npx degit hoipippeloi/llmngn.xyz/.opencode .opencode && cd .opencode && bun install && cd ..
 ```
 
+This installs:
+- Plugin hooks (`.opencode/plugins/llmngn.ts`)
+- Configuration (`.opencode/plugins/llmngn.json`)
+- Interactive command (`.opencode/commands/llmngn.md`)
+
 ## How It Works
 
 ```
@@ -30,6 +35,21 @@ npx degit hoipippeloi/llmngn.xyz/.opencode .opencode && cd .opencode && bun inst
 - **Auto-Redaction** - Filters API keys, passwords, tokens
 - **Weighted Scoring** - Prioritizes decisions over commands
 - **Zero Config** - Works out of the box
+- **Interactive Command** - `/llmngn` for natural language queries
+
+## Interactive Command
+
+Use `/llmngn` in OpenCode for natural language interaction:
+
+```
+/llmngn store that we decided to use Redis for caching
+/llmngn show me my latest records
+/llmngn find anything about authentication
+/llmngn export my data
+/llmngn what patterns do I have?
+```
+
+The command understands the plugin E2E and infers the right action from your intent.
 
 ## Context Types
 

@@ -39,6 +39,7 @@ npm-debug.log*
 # Project files
 .opencode/
 !.opencode/plugins/
+!.opencode/commands/
 llm-prompt.md
 opencode-events.md
 prompts.md
