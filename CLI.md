@@ -30,6 +30,13 @@ cd llmngn.xyz && npm install && npm link
 
 ## Command Details
 
+### init
+```bash
+llmngn init [--embedding-model <model>]
+```
+Initializes plugin and stores a usage instructions record in the database. Future sessions can query this record to understand how to use the plugin.
+- `--embedding-model` - Set custom embedding model
+
 ### add
 ```bash
 llmngn add <content> [-t type] [-s session] [-m metadata]

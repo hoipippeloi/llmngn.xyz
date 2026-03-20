@@ -60,7 +60,7 @@ export class CLI {
     this.configManager = new ConfigManager(projectDir)
   }
 
-  async init(options: InitOptions): Promise<void> {
+  async init(options: InitOptions): Promise<{ id: string }> {
     let config = await this.configManager.load()
     
     if (options.embeddingModel) {
@@ -73,6 +73,75 @@ export class CLI {
     const dbPath = config.lancedbPath
     this.db = new LanceDBClient(dbPath)
     await this.db.initialize()
+
+    const initRecord = await this.storeInitRecord(config)
+    return { id: initRecord.id }
+  }
+
+  private async storeInitRecord(config: PluginConfig): Promise<{ id: string }> {
+    const embedder = createEmbeddingProvider({
+      provider: config.embeddingProvider,
+      model: config.embeddingModel,
+      apiKey: config.apiKey
+    })
+
+    const projectId = this.getProjectId()
+    const sessionId = `init-${Date.now()}`
+    
+    const usageInstructions = `LLMNGN Context Persistence Plugin - Initialized ${new Date().toISOString()}
+
+## What This Plugin Does
+This plugin maintains semantic continuity across coding sessions by storing and retrieving context (decisions, file changes, commands, etc.) in a local LanceDB vector database.
+
+## CLI Commands Available
+- llmngn init - Initialize/reinitialize plugin
+- llmngn add <content> - Add context record manually
+- llmngn list [-t type] [-l limit] - List records
+- llmngn get <id> - Get record by ID
+- llmngn query <text> - Search context semantically
+- llmngn delete <id> --force - Delete record
+- llmngn clean - Remove expired records
+- llmngn history - View session history
+- llmngn stats - Database statistics
+- llmngn export/import - Backup/restore
+- llmngn purge --force - Clear all data
+- llmngn config list/set/get - Manage settings
+
+## Context Types
+- decision (weight 1.0, 180 days) - Architectural decisions
+- architecture (weight 1.0, 365 days) - Component relationships
+- debt (weight 0.9, 90 days) - Technical debt items
+- file_change (weight 0.8, 90 days) - File modifications
+- task (weight 0.7, 60 days) - Task progress
+- command (weight 0.5, 30 days) - Build/CLI commands
+
+## Config Location
+.opencode/plugins/llmngn.json
+
+## Database Location
+.lancedb/`
+
+    const embedding = await embedder.encode(usageInstructions)
+
+    const record: ContextRecord = {
+      id: uuidv4(),
+      vector: embedding.vector,
+      projectId,
+      contextType: 'architecture',
+      content: usageInstructions,
+      metadata: { 
+        type: 'llmngn_init',
+        projectDir: this.projectDir,
+        initializedAt: new Date().toISOString()
+      },
+      sessionId,
+      createdAt: new Date().toISOString(),
+      salience: 1.0
+    }
+
+    await this.db!.insert(record)
+    
+    return { id: record.id }
   }
 
   async add(options: AddOptions): Promise<{ id: string }> {
@@ -325,8 +394,12 @@ export function createProgram(cli: CLI): Command {
     .description('Initialize plugin in current project')
     .option('--embedding-model <model>', 'Embedding model to use')
     .action(async (options) => {
-      await cli.init(options)
-      console.log('LLMNGN initialized')
+      const result = await cli.init(options)
+      console.log(JSON.stringify({
+        status: 'initialized',
+        recordId: result.id,
+        message: 'Init record stored with usage instructions for future sessions'
+      }, null, 2))
     })
 
   program

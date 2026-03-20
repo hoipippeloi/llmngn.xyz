@@ -66,6 +66,12 @@ export interface CommandMetadata {
   workingDirectory: string
 }
 
+export interface InitMetadata {
+  type: 'llmngn_init'
+  projectDir: string
+  initializedAt: string
+}
+
 export type ContextMetadata =
   | FileChangeMetadata
   | DecisionMetadata
@@ -73,6 +79,8 @@ export type ContextMetadata =
   | TaskMetadata
   | ArchitectureMetadata
   | CommandMetadata
+  | InitMetadata
+  | Record<string, unknown>
 
 export interface ContextRecord {
   id: string

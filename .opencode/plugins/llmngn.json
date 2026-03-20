@@ -6,7 +6,7 @@
   "maxContextTokens": 4096,
   "queryLatencyMs": 500,
   "salienceDecay": 0.95,
-  "retentionDays": 120,
+  "retentionDays": 180,
   "contextTypes": [
     "file_change",
     "decision",

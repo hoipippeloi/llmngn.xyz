@@ -63,6 +63,7 @@ describe('CLI', () => {
   describe('add', () => {
     it('should add context record', async () => {
       await cli.init({})
+      mocks.insert.mockClear()
       
       const result = await cli.add({ content: 'Test decision' })
       expect(result.id).toBeDefined()
@@ -71,6 +72,7 @@ describe('CLI', () => {
 
     it('should add record with custom type', async () => {
       await cli.init({})
+      mocks.insert.mockClear()
       
       await cli.add({ content: 'Test command', type: 'command' })
       expect(mocks.insert).toHaveBeenCalled()
@@ -80,6 +82,7 @@ describe('CLI', () => {
 
     it('should add record with metadata', async () => {
       await cli.init({})
+      mocks.insert.mockClear()
       
       await cli.add({ 
         content: 'Test', 
