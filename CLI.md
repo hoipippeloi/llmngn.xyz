@@ -1,70 +1,84 @@
-# CLI Reference for llmngn
+# LLMNGN CLI Reference
 
-Quick reference for all commands available in this project.
+CLI for managing the LLMNGN context database.
 
-## Development
+## Installation
 
-| Command | When/Why |
-|---------|----------|
-| `npm run dev` | Start TypeScript watch mode during development |
-| `npm run build` | Compile TypeScript to `dist/` before publishing or testing |
-| `npm run typecheck` | Check types without emitting - run before committing |
+```bash
+# Clone repo and link CLI globally
+git clone https://github.com/hoipippeloi/llmngn.xyz.git
+cd llmngn.xyz && npm install && npm link
+```
 
-## Testing
+## Commands
 
-| Command | When/Why |
-|---------|----------|
-| `npm test` | Run all tests once (CI/pre-commit) |
-| `npm run test:watch` | Run tests interactively during development |
-| `npm run test:coverage` | Generate coverage report |
+| Command | Description |
+|---------|-------------|
+| `llmngn init` | Initialize plugin in current project |
+| `llmngn query <text>` | Search stored context |
+| `llmngn history` | View session history |
+| `llmngn stats` | Show database statistics |
+| `llmngn export -o <file>` | Export context to JSON |
+| `llmngn import <file>` | Import context from JSON |
+| `llmngn purge --force` | Delete all stored context |
+| `llmngn config list` | Show all settings |
+| `llmngn config set <key> <value>` | Update setting |
+| `llmngn config get <key>` | Get setting value |
 
-## LLMNGN CLI
+## Options
 
-The `llmngn` binary for managing the context database:
+### query
+```
+llmngn query <text> [--limit n] [--types type1,type2]
+```
 
-| Command | When/Why |
-|---------|----------|
-| `llmngn init` | Initialize plugin in a new project |
-| `llmngn query <text>` | Search stored context from previous sessions |
-| `llmngn history` | View session history with context counts |
-| `llmngn stats` | Check database size and record counts |
-| `llmngn export -o backup.json` | Backup context before major changes |
-| `llmngn import backup.json` | Restore from backup |
-| `llmngn purge --force` | Clear all stored context |
-| `llmngn config list` | View current plugin settings |
-| `llmngn config set <key> <value>` | Update a config setting |
-| `llmngn config get <key>` | Get a specific config value |
+### export
+```
+llmngn export [--output file]
+```
 
-## Plugin Setup
+### import
+```
+llmngn import <file>
+```
 
-| Command | When/Why |
-|---------|----------|
-| `cd .opencode && bun install && cd ..` | Install plugin dependencies |
+### purge
+```
+llmngn purge --force
+```
 
 ## Examples
 
 ```bash
-# Start development
-npm run dev
+# Initialize in a new project
+llmngn init
 
-# In another terminal, run tests on change
-npm run test:watch
+# Search for past decisions
+llmngn query "authentication" --types decision --limit 10
 
-# Before committing
-npm run typecheck && npm test
+# View recent sessions
+llmngn history --sessions 5
 
-# Build for production
-npm run build
-
-# Search for past decisions about authentication
-llmngn query "authentication" --types decision
-
-# Export context as backup before refactor
-llmngn export --output backup.json
-
-# Check database health
+# Check database size
 llmngn stats
 
-# Clear all stored context
+# Backup before refactor
+llmngn export --output backup.json
+
+# Restore from backup
+llmngn import backup.json
+
+# Update retention days
+llmngn config set retentionDays 120
+
+# Clear everything
 llmngn purge --force
+```
+
+## Development
+
+```bash
+npm run build      # Compile TypeScript
+npm run typecheck  # Type check
+npm test           # Run tests
 ```
