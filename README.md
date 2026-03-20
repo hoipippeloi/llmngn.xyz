@@ -45,11 +45,21 @@ npx degit hoipippeloi/llmngn.xyz/.opencode .opencode && cd .opencode && bun inst
 ## CLI
 
 ```bash
-llmngn init                    # Initialize
-llmngn query "auth"            # Search context
-llmngn stats                   # Database info
-llmngn export -o backup.json   # Backup
-llmngn purge --force           # Clear all
+# Install CLI globally
+git clone https://github.com/hoipippeloi/llmngn.xyz.git
+cd llmngn.xyz && npm install && npm link
+
+# Usage
+llmngn init                        # Initialize
+llmngn add "Decision text"         # Add record
+llmngn list                        # List all
+llmngn get <id>                    # Get by ID
+llmngn query "auth"                # Search
+llmngn delete <id> --force         # Delete
+llmngn clean                       # Remove expired
+llmngn stats                       # Database info
+llmngn export -o backup.json       # Backup
+llmngn purge --force               # Clear all
 ```
 
 See [CLI.md](./CLI.md) for full reference.

@@ -14,7 +14,7 @@ npx degit hoipippeloi/llmngn.xyz/.opencode .opencode && cd .opencode && bun inst
 
 Start OpenCode in your project. The plugin auto-loads - no additional setup required.
 
-## CLI (Optional)
+## CLI Installation
 
 For the `llmngn` CLI commands:
 
@@ -24,18 +24,36 @@ cd llmngn.xyz && npm install && npm link
 llmngn --help
 ```
 
+## CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `llmngn init` | Initialize plugin |
+| `llmngn add <content>` | Add record |
+| `llmngn list` | List all records |
+| `llmngn get <id>` | Get by ID |
+| `llmngn query <text>` | Search |
+| `llmngn delete <id>` | Delete record |
+| `llmngn clean` | Remove expired |
+| `llmngn stats` | Database info |
+| `llmngn export -o <file>` | Backup |
+| `llmngn import <file>` | Restore |
+| `llmngn purge --force` | Clear all |
+
+See [CLI.md](./CLI.md) for details.
+
 ## Configuration
 
-Edit `.opencode/plugins/llmngn.json` to customize:
+Edit `.opencode/plugins/llmngn.json`:
 
 | Option | Default | Description |
 |--------|---------|-------------|
 | `enabled` | `true` | Enable/disable plugin |
 | `lancedbPath` | `".lancedb"` | Database location |
 | `maxContextTokens` | `4096` | Max tokens per injection |
-| `retentionDays` | `90` | How long to keep context |
+| `retentionDays` | `90` | Days to keep context |
 | `filters.excludePatterns` | `["**/node_modules/**", ...]` | Files to skip |
-| `filters.sensitiveDataRedaction` | `true` | Redact API keys/passwords |
+| `filters.sensitiveDataRedaction` | `true` | Redact secrets |
 
 ## How It Works
 

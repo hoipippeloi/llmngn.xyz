@@ -204,8 +204,23 @@ table.create_index("created_at")
 # Initialize plugin in current project
 llmngn init [--embedding-model <model>]
 
-# Query stored context
-llmngn query <text> [--limit <n>] [--type <type>]
+# Add context record manually
+llmngn add <content> [--type <type>] [--session <id>] [--metadata <json>]
+
+# List all records
+llmngn list [--limit <n>] [--type <type>] [--session <id>]
+
+# Get record by ID
+llmngn get <id>
+
+# Query stored context (semantic search)
+llmngn query <text> [--limit <n>] [--types <type1,type2>]
+
+# Delete record by ID
+llmngn delete <id> [--force]
+
+# Delete expired records
+llmngn clean
 
 # Show session history
 llmngn history [--sessions <n>]
@@ -216,7 +231,7 @@ llmngn export [--output <path>]
 # Import context from backup
 llmngn import <path>
 
-# Clear stored context
+# Clear all stored context
 llmngn purge [--force]
 
 # Show database statistics
@@ -231,7 +246,7 @@ llmngn config list
 ### 3.2 Plugin Hook Interface
 
 ```typescript
-export const ContextPersistencePlugin = async ({ client, directory }) => {
+export const LLMNGNPlugin = async ({ client, directory }) => {
   const db = await initLanceDB(directory)
   const projectId = basename(directory)  // Folder name, e.g., "llmngn.xyz"
   
@@ -770,7 +785,7 @@ async function migrateSchema(db, fromVersion, toVersion) {
 **Test Framework:** Vitest (aligned with project stack)
 
 ```typescript
-describe('ContextPersistencePlugin', () => {
+describe('LLMNGNPlugin', () => {
   it('injects prior session context on session.created', async () => {
     // Arrange
     const mockDB = createMockLanceDB()
