@@ -7,6 +7,7 @@ import type { PluginConfig, ContextType, ContextRecord } from '../types/index.js
 import { readFile, writeFile } from 'fs/promises'
 import { createHash } from 'crypto'
 import { v4 as uuidv4 } from 'uuid'
+import { join } from 'path'
 
 export interface InitOptions {
   embeddingModel?: string
@@ -39,6 +40,11 @@ export interface ImportOptions {
 
 export interface PurgeOptions {
   force?: boolean
+}
+
+export interface UninstallOptions {
+  keepDb?: boolean
+  full?: boolean
 }
 
 export interface StatsResult {
@@ -74,8 +80,80 @@ export class CLI {
     this.db = new LanceDBClient(dbPath)
     await this.db.initialize()
 
+    await this.createReadmeFile()
+    
     const initRecord = await this.storeInitRecord(config)
     return { id: initRecord.id }
+  }
+
+  private async createReadmeFile(): Promise<void> {
+    const readmeContent = `# LLMNGN
+
+Context persistence plugin for OpenCode - stores and retrieves context across sessions.
+
+## Quick Commands
+
+| Command | Use |
+|---------|-----|
+| \`llmngn add <text>\` | Store a decision/note |
+| \`llmngn list\` | List all records |
+| \`llmngn query <text>\` | Search context |
+| \`llmngn stats\` | Database info |
+| \`llmngn clean\` | Remove expired |
+| \`llmngn purge --force\` | Clear all |
+| \`llmngn uninstall --keep-db\` | Remove plugin only |
+| \`llmngn uninstall --full\` | Remove everything |
+
+## Examples
+
+\`\`\`bash
+# Store a decision
+llmngn add "Use Redis for caching" -t decision
+
+# Store with metadata
+llmngn add "Fixed auth bug" -t file_change -m '{"file":"src/auth.ts"}'
+
+# List decisions only
+llmngn list -t decision -l 20
+
+# Search for something
+llmngn query "authentication" -l 10
+
+# Get specific record
+llmngn get <id>
+
+# Delete a record
+llmngn delete <id> --force
+
+# Backup before changes
+llmngn export -o backup.json
+
+# Restore from backup
+llmngn import backup.json
+
+# View session history
+llmngn history
+
+# Remove only plugin files (keep database)
+llmngn uninstall --keep-db
+
+# Remove everything including database
+llmngn uninstall --full
+\`\`\`
+
+## Files
+
+- \`.opencode/plugins/llmngn.ts\` - Plugin code
+- \`.opencode/plugins/llmngn.json\` - Config
+- \`.lancedb/\` - Database
+
+## Config
+
+Edit \`.opencode/plugins/llmngn.json\` to customize retention, weights, filters.
+`
+
+    const readmePath = join(this.projectDir, 'LLMNGN.md')
+    await writeFile(readmePath, readmeContent)
   }
 
   private async storeInitRecord(config: PluginConfig): Promise<{ id: string }> {
@@ -284,6 +362,49 @@ This plugin maintains semantic continuity across coding sessions by storing and 
     await fs.rm(config.lancedbPath, { recursive: true, force: true })
     
     this.db = null
+  }
+
+  async uninstall(options: UninstallOptions): Promise<{ removed: string[] }> {
+    if (!options.keepDb && !options.full) {
+      throw new Error('Uninstall requires --keep-db or --full flag')
+    }
+
+    const removed: string[] = []
+    const fs = await import('fs/promises')
+
+    const pluginTs = join(this.projectDir, '.opencode', 'plugins', 'llmngn.ts')
+    const pluginJson = join(this.projectDir, '.opencode', 'plugins', 'llmngn.json')
+
+    try {
+      await fs.rm(pluginTs, { force: true })
+      removed.push('.opencode/plugins/llmngn.ts')
+    } catch { /* ignore */ }
+
+    try {
+      await fs.rm(pluginJson, { force: true })
+      removed.push('.opencode/plugins/llmngn.json')
+    } catch { /* ignore */ }
+
+    if (options.full) {
+      if (this.db) {
+        await this.db.close()
+        this.db = null
+      }
+
+      const config = await this.configManager.load()
+      try {
+        await fs.rm(config.lancedbPath, { recursive: true, force: true })
+        removed.push('.lancedb/')
+      } catch { /* ignore */ }
+
+      const readmePath = join(this.projectDir, 'LLMNGN.md')
+      try {
+        await fs.rm(readmePath, { force: true })
+        removed.push('LLMNGN.md')
+      } catch { /* ignore */ }
+    }
+
+    return { removed }
   }
 
   async stats(): Promise<StatsResult> {
@@ -528,6 +649,16 @@ export function createProgram(cli: CLI): Command {
     .action(async () => {
       const count = await cli.clean()
       console.log(JSON.stringify({ deleted: count }, null, 2))
+    })
+
+  program
+    .command('uninstall')
+    .description('Remove LLMNGN plugin from project')
+    .option('--keep-db', 'Remove plugin files only, keep database')
+    .option('--full', 'Remove everything including database and LLMMNGN.md')
+    .action(async (options) => {
+      const result = await cli.uninstall({ keepDb: options.keepDb, full: options.full })
+      console.log(JSON.stringify({ status: 'uninstalled', ...result }, null, 2))
     })
 
   program
