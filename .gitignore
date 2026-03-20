@@ -38,6 +38,10 @@ npm-debug.log*
 
 # Project files
 .opencode/
+!.opencode/plugins/
 llm-prompt.md
 opencode-events.md
 prompts.md
+
+# Plugin data
+.lancedb/

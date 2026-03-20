@@ -1,0 +1,8 @@
+export { ContextPersistencePlugin } from './hooks/plugin.js'
+export { ContextRetriever } from './context/retriever.js'
+export { ContextPersister } from './context/persister.js'
+export { LanceDBClient } from './database/client.js'
+export { CloudEmbeddingProvider, LocalEmbeddingProvider, createEmbeddingProvider } from './embedding/embedding.js'
+export { ConfigManager } from './utils/config.js'
+export { CLI, createProgram, main } from './cli/index.js'
+export * from './types/index.js'

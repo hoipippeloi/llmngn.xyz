@@ -1,0 +1,49 @@
+{
+  "name": "context-persistence-plugin",
+  "version": "0.1.0",
+  "description": "Context Persistence Plugin for OpenCode - maintains semantic continuity across coding sessions using LanceDB",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "context-persist": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "opencode",
+    "plugin",
+    "context",
+    "persistence",
+    "lancedb",
+    "vector-database",
+    "embedding",
+    "llm"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@lancedb/lancedb": "^0.4.0",
+    "commander": "^12.0.0",
+    "chalk": "^5.3.0",
+    "uuid": "^9.0.0",
+    "ora": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/uuid": "^9.0.0",
+    "@vitest/coverage-v8": "^1.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

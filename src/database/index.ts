@@ -1,0 +1,1 @@
+export { LanceDBClient } from './client.js'
