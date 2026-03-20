@@ -4,9 +4,9 @@
   "embeddingProvider": "local",
   "lancedbPath": ".lancedb",
   "maxContextTokens": 4096,
-  "queryLatencyMs": 500,
   "salienceDecay": 0.95,
   "retentionDays": 90,
+  "debug": true,
   "contextTypes": [
     "file_change",
     "decision",
@@ -27,6 +27,7 @@
     "excludePatterns": [
       "**/node_modules/**",
       "**/dist/**",
+      "**/.git/**",
       "**/build/**",
       "**/*.min.js",
       "**/.env*",

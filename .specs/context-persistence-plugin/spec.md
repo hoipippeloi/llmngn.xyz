@@ -82,15 +82,17 @@ Project Root/
 | Field | Type | Indexed | Description |
 |-------|------|---------|-------------|
 | `id` | UUID | Yes (Primary) | Unique record identifier |
-| `vector` | Float[768] | Yes (IVF_PQ) | Embedding vector |
-| `project_id` | String | Yes | Project identifier (SHA-256 of path) |
-| `context_type` | Enum | Yes | Category: `file_change`, `decision`, `debt`, `task`, `architecture`, `command` |
+| `vector` | Float[128] | Yes (IVF_PQ) | Embedding vector (128 dimensions) |
+| `projectId` | String | Yes | Project identifier (folder name where .opencode/package.json/.git exists) |
+| `contextType` | Enum | Yes | Category: `file_change`, `decision`, `debt`, `task`, `architecture`, `command` |
 | `content` | Text | No | Raw text content for embedding |
-| `metadata` | JSON | No | Structured metadata (see below) |
-| `session_id` | String | Yes | Source session identifier |
-| `created_at` | Timestamp | Yes | Record creation time |
-| `expires_at` | Timestamp | No | TTL for automatic pruning |
+| `metadata` | String (JSON) | No | Structured metadata stored as JSON string |
+| `sessionId` | String | Yes | Source session identifier |
+| `createdAt` | Number | Yes | Record creation time (Unix timestamp in ms) |
+| `expiresAt` | Number | No | TTL for automatic pruning (Unix timestamp in ms) |
 | `salience` | Float | Yes | Importance score (0.0-1.0) |
+
+**Note:** The schema uses camelCase field names. The `projectId` is derived from the project folder name (e.g., "llmngn.xyz") rather than a hash, making it human-readable and portable.
 
 ### 2.2 Metadata Schema by Context Type
 
@@ -145,6 +147,16 @@ interface CommandMetadata {
 ```
 
 ### 2.3 Embedding Strategy
+
+**Vector Dimensions:** 128 (local simple embedding)
+
+**Embedding Algorithm:**
+The current implementation uses a simple deterministic embedding that:
+1. Splits text into words (max 50)
+2. Creates a 128-dimensional vector from character code patterns
+3. Applies tanh normalization
+
+This provides basic semantic similarity without external API dependencies. Future versions may support pluggable embedding providers (nomic-embed-text, OpenAI, local transformers).
 
 **Embedded Fields:**
 - `content` (primary): Concatenated summary of changes, decisions, rationale
@@ -221,56 +233,61 @@ context-persist config list
 ```typescript
 export const ContextPersistencePlugin = async ({ client, directory }) => {
   const db = await initLanceDB(directory)
-  const embedder = createEmbedder(config.embeddingModel)
+  const projectId = basename(directory)  // Folder name, e.g., "llmngn.xyz"
   
   return {
     // === READ PATH ===
     
-    "session.created": async (input, output) => {
-      const context = await queryRelevantContext(db, directory, embedder)
-      if (context) {
-        output.context.push(formatContextInjection(context))
+    "experimental.chat.system.transform": async (_input, output) => {
+      // Primary context injection point - fires before each LLM call
+      const context = await queryRelevantContext(db, projectId)
+      if (context.length > 0) {
+        output.system.push(formatContextInjection(context))
       }
     },
     
-    "experimental.session.compacting": async (input, output) => {
-      const persistentContext = await getPersistentContext(db, directory)
-      output.context.push(persistentContext)
+    "session.created": async (input) => {
+      // Track session ID for associating records
+      sessionId = input.session?.sessionId
     },
     
     // === WRITE PATH ===
     
-    "session.idle": async (input, output) => {
-      await persistSessionSummary(db, input.session, embedder)
+    "session.idle": async () => {
+      // Persist accumulated session data when session becomes idle
+      await persistSessionSummary(db, sessionData, projectId)
     },
     
-    "file.edited": async (input, output) => {
-      await logFileChange(db, input.filePath, input.changes, embedder)
-    },
-    
-    "command.executed": async (input, output) => {
-      await logCommandExecution(db, input.command, output.result, embedder)
-    },
+    // Primary capture hooks using tool.execute.after
+    // Note: file.edited and command.executed hooks don't fire in OpenCode
+    // We use tool.execute.after to capture bash, write, and edit operations
     
     "tool.execute.after": async (input, output) => {
-      await logToolExecution(db, input.tool, output.result, embedder)
-    },
-    
-    "message.updated": async (input, output) => {
-      if (isDecisionMessage(input.message)) {
-        await logDecision(db, input.message, embedder)
+      if (input.tool === "bash") {
+        await persistCommand(db, output.args.command, projectId)
+      }
+      if (input.tool === "write" || input.tool === "edit") {
+        await persistFileChange(db, output.args.filePath, input.tool, projectId)
       }
     },
     
-    "todo.updated": async (input, output) => {
-      await syncTaskState(db, input.todo, embedder)
+    // Legacy hooks (kept for compatibility, may not fire in all OpenCode versions)
+    "file.edited": async (input) => {
+      await logFileChange(db, input.filePath, input.changes, projectId)
     },
     
-    "session.error": async (input, output) => {
-      await logErrorState(db, input.error, input.session, embedder)
+    "command.executed": async (input) => {
+      await logCommandExecution(db, input.command, input.result, projectId)
     },
   }
 }
+```
+
+**Implementation Notes:**
+- `experimental.chat.system.transform` is the primary hook for context injection
+- `tool.execute.after` captures bash commands and file edits (write/edit tools)
+- Legacy hooks (`file.edited`, `command.executed`) are registered but may not fire
+- `projectId` uses folder name for human-readable identification
 ```
 
 ### 3.3 Configuration File Format
@@ -281,13 +298,12 @@ export const ContextPersistencePlugin = async ({ client, directory }) => {
 {
   "enabled": true,
   "embeddingModel": "nomic-embed-text",
-  "embeddingProvider": "cloud",
-  "apiKey": "<optional>",
+  "embeddingProvider": "local",
   "lancedbPath": ".lancedb",
   "maxContextTokens": 4096,
-  "queryLatencyMs": 500,
   "salienceDecay": 0.95,
   "retentionDays": 90,
+  "debug": true,
   "contextTypes": [
     "file_change",
     "decision",
@@ -308,6 +324,7 @@ export const ContextPersistencePlugin = async ({ client, directory }) => {
     "excludePatterns": [
       "**/node_modules/**",
       "**/dist/**",
+      "**/.git/**",
       "**/build/**",
       "**/*.min.js",
       "**/.env*",
@@ -316,6 +333,14 @@ export const ContextPersistencePlugin = async ({ client, directory }) => {
     "sensitiveDataRedaction": true
   }
 }
+```
+
+**Key Settings:**
+- `debug`: Enable verbose logging to `.opencode/plugins/context-persistence-debug.log`
+- `lancedbPath`: Relative path from project root for database storage
+- `weights`: Importance multipliers for different context types
+- `filters.excludePatterns`: Glob patterns for files to skip
+- `filters.sensitiveDataRedaction`: Auto-redact API keys, passwords, etc.
 ```
 
 ---
@@ -445,20 +470,20 @@ def calculate_priority(record, query_vector):
 ### 6.1 Query Patterns
 
 ```typescript
-// Primary query: semantic similarity + filters
-async function queryRelevantContext(db, projectDir, embedder, options) {
-  const queryVector = await embedder.encode(options.intent || '')
-  
-  const results = await db.table('codebase_context')
-    .search(queryVector)
-    .filter(`project_id = '${projectHash}'`)
-    .filter(`context_type IN (${options.types.join(',')})`)
-    .filter(`created_at > ${options.since}`)
+// Primary query: filter by projectId
+async function queryRelevantContext(db, projectId, options) {
+  const table = await db.openTable('codebase_context')
+  const results = await table.query()
     .limit(options.limit || 50)
-    .toVector()
+    .toArray()
   
-  return applyWeightedRanking(results, options.weights)
+  // Filter by projectId (folder name)
+  return results.filter(r => r.projectId === projectId)
 }
+
+// Note: Full vector search requires explicit index creation
+// Current implementation uses filtering + in-memory processing
+```
 ```
 
 ### 6.2 Relevance Scoring
@@ -574,13 +599,14 @@ async function handleEmbeddingFailure(record, embedder, cache) {
 ### 8.1 Data Isolation
 
 **Project Isolation:**
-- `project_id` derived from absolute path SHA-256
-- All queries include `project_id` filter
-- Separate LanceDB tables per project (optional)
+- `projectId` derived from folder name (basename of project directory)
+- Example: `/Users/dev/my-project` → `my-project`
+- All queries include `projectId` filter
+- Separate LanceDB databases per project (stored in `.lancedb/`)
 
 **User Isolation:**
-- Database stored in user home directory by default
-- Per-user API key configuration
+- Database stored in project directory by default
+- Per-user configuration in `.opencode/plugins/context-persistence.json`
 
 ### 8.2 Access Controls
 
@@ -644,13 +670,13 @@ function redactSensitiveData(content: string): string {
 
 **Per Session:**
 - Average context records: 10-20
-- Vector size: 768 floats × 4 bytes = 3KB per record
+- Vector size: 128 floats × 4 bytes = 512 bytes per record
 - Metadata overhead: ~1KB per record
-- **Total per session:** ~50-100KB
+- **Total per session:** ~15-35KB
 
 **Per 1000 Sessions:**
-- **Estimated size:** 50-100MB
-- **Growth rate:** ~50KB/session
+- **Estimated size:** 15-35MB
+- **Growth rate:** ~25KB/session
 
 ### 9.3 Maximum Context Injection
 
@@ -849,11 +875,12 @@ describe('ContextPersistencePlugin', () => {
 
 | Symptom | Probable Cause | Resolution |
 |---------|----------------|------------|
-| Context not injected | Empty database | Run 3-5 sessions to warm up |
+| Context not injected | Empty database | Run 2-3 sessions to accumulate context |
+| Context not injected | `experimental.chat.system.transform` not firing | Check OpenCode version compatibility |
+| Hooks not firing | `file.edited`/`command.executed` deprecated | Use `tool.execute.after` instead |
+| Schema mismatch error | Old database with snake_case fields | Delete `.lancedb/` and reinitialize |
 | Slow session start | Large context query | Reduce `maxContextTokens` |
-| Embedding failures | API key invalid | Check `config.apiKey` |
-| Database corruption | Process killed mid-write | Run `context-persist init --force` |
-| High memory usage | Large vector index | Reduce `num_partitions` in index |
+| Database errors | LanceDB not installed | Run `bun install` in `.opencode/` |
 
 ### 15.2 Diagnostic Commands
 
@@ -873,10 +900,17 @@ context-persist logs --output debug.log
 
 ### 15.3 Support Escalation
 
-1. Check logs: `.opencode/plugins/context-persistence.log`
-2. Run diagnostics: `context-persist stats --verbose`
-3. Export context: `context-persist export --output backup.zip`
+1. Check debug logs: `.opencode/plugins/context-persistence-debug.log`
+2. Verify LanceDB exists: `.lancedb/codebase_context.lance/`
+3. Check configuration: `.opencode/plugins/context-persistence.json`
 4. File issue: https://github.com/llmngn.xyz/context-persistence-plugin/issues
+
+**Debug Mode:**
+Set `"debug": true` in config to enable verbose logging to the debug log file. This captures:
+- Hook firing events
+- Database operations
+- Query results
+- Error details
 
 ---
 
@@ -903,9 +937,38 @@ context-persist logs --output debug.log
 |---------|------|---------|
 | 1.0 | 2025-01-19 | Initial specification |
 | 1.1 | 2026-03-20 | Updated for current date, refined LanceDB schema |
+| 1.2 | 2026-03-20 | Implementation updates: camelCase schema, 128-dim vectors, folder-based projectId, tool.execute.after hooks |
 
 ---
 
-**Specification Status:** Ready for Implementation
+## Implementation Notes
 
-**Next Steps:** Generate `tasks.json` following TE9-Spec workflow to break this specification into test-driven development tasks.
+### Actual Implementation (v1.2)
+
+The current implementation differs from the original spec in several ways:
+
+**Schema Changes:**
+- Vector dimension reduced from 768 to 128 (simpler local embedding)
+- Field names use camelCase (`projectId` not `project_id`)
+- Timestamps are Unix milliseconds (numbers) not ISO strings
+- Metadata stored as JSON string
+
+**Hook Strategy:**
+- Primary context injection: `experimental.chat.system.transform`
+- Command capture: `tool.execute.after` (bash tool)
+- File change capture: `tool.execute.after` (write/edit tools)
+- Legacy hooks registered but may not fire
+
+**Project ID:**
+- Uses folder name (e.g., `llmngn.xyz`) for human-readable identification
+- Portable across different mount points
+
+**Debug Logging:**
+- Logs written to `.opencode/plugins/context-persistence-debug.log`
+- Enables troubleshooting of hook firing and data flow
+
+---
+
+**Specification Status:** Implemented
+
+**Next Steps:** Add CLI commands for context management (query, export, purge).

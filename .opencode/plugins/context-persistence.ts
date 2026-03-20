@@ -1,7 +1,6 @@
 import type { Plugin } from "@opencode-ai/plugin"
-import { createHash } from "crypto"
-import { readFile, mkdir } from "fs/promises"
-import { join } from "path"
+import { readFile, mkdir, appendFile, writeFile } from "fs/promises"
+import { join, basename } from "path"
 
 const REDACTION_PATTERNS = [
   /API_KEY=\S+/gi,
@@ -22,6 +21,7 @@ const DEFAULT_CONFIG = {
   maxContextTokens: 4096,
   salienceDecay: 0.95,
   retentionDays: 90,
+  debug: true,
   contextTypes: ["file_change", "decision", "debt", "task", "architecture", "command"],
   weights: { file_change: 0.8, decision: 1, debt: 0.9, task: 0.7, architecture: 1, command: 0.5 },
   filters: {
@@ -36,10 +36,10 @@ interface ContextRecord {
   projectId: string
   contextType: string
   content: string
-  metadata: Record<string, unknown>
+  metadata: string
   sessionId: string
-  createdAt: string
-  expiresAt?: string
+  createdAt: number
+  expiresAt: number
   salience: number
 }
 
@@ -53,6 +53,20 @@ interface SessionData {
 let globalDb: any = null
 let globalConfig: typeof DEFAULT_CONFIG | null = null
 let globalProjectId: string | null = null
+let debugLogPath: string | null = null
+let hookCalls: string[] = []
+
+async function debugLog(message: string, data?: any): Promise<void> {
+  const timestamp = new Date().toISOString()
+  const entry = `[${timestamp}] ${message}${data ? ' ' + JSON.stringify(data) : ''}\n`
+  hookCalls.push(entry)
+  
+  if (debugLogPath) {
+    try {
+      await appendFile(debugLogPath, entry)
+    } catch {}
+  }
+}
 
 async function loadConfig(directory: string): Promise<typeof DEFAULT_CONFIG> {
   const configPath = join(directory, ".opencode", "plugins", "context-persistence.json")
@@ -107,12 +121,17 @@ function getExpiry(contextType: string): string {
   return expiry.toISOString()
 }
 
-async function initDatabase(dbPath: string): Promise<any> {
+async function initDatabase(dbPath: string, directory: string): Promise<any> {
+  await debugLog("initDatabase: starting", { dbPath, directory })
   try {
     const lancedb = await import("@lancedb/lancedb")
-    const dbInstance = await lancedb.connect(dbPath)
+    await debugLog("initDatabase: lancedb imported successfully")
+    const fullPath = join(directory, dbPath)
+    const dbInstance = await lancedb.connect(fullPath)
+    await debugLog("initDatabase: connected successfully", { fullPath })
     return dbInstance
   } catch (e) {
+    await debugLog("initDatabase: FAILED", { error: String(e), stack: (e as Error).stack })
     return null
   }
 }
@@ -121,21 +140,45 @@ async function insertRecord(db: any, record: ContextRecord): Promise<void> {
   try {
     const table = await db.openTable("codebase_context")
     await table.add([record])
-  } catch {
+    await debugLog("insertRecord: added to existing table", { id: record.id, type: record.contextType })
+  } catch (e) {
+    await debugLog("insertRecord: openTable failed, trying createTable", { error: String(e) })
     try {
-      await db.createTable("codebase_context", [record])
+      await db.createTable("codebase_context", [
+        {
+          id: "init",
+          vector: Array(128).fill(0),
+          projectId: "init",
+          contextType: "init",
+          content: "init",
+          metadata: "{}",
+          sessionId: "init",
+          createdAt: Date.now(),
+          expiresAt: Date.now() + 86400000,
+          salience: 1.0
+        }
+      ])
+      await debugLog("insertRecord: created new table, now adding record")
+      const table2 = await db.openTable("codebase_context")
+      await table2.add([record])
+      await debugLog("insertRecord: added to new table", { id: record.id, type: record.contextType })
     } catch (createErr) {
-      // Table might already exist with different schema
+      await debugLog("insertRecord: FAILED", { error: String(createErr) })
     }
   }
 }
 
 async function queryRecords(db: any, limit: number, projectId: string): Promise<ContextRecord[]> {
+  await debugLog("queryRecords: starting", { limit, projectId })
   try {
     const table = await db.openTable("codebase_context")
     const results = await table.query().limit(limit).toArray()
-    return results.filter((r: ContextRecord) => r.projectId === projectId)
-  } catch {
+    await debugLog("queryRecords: got results", { totalResults: results.length })
+    const filtered = results.filter((r: any) => r.projectId === projectId)
+    await debugLog("queryRecords: filtered by projectId", { filteredCount: filtered.length, searchProjectId: projectId })
+    return filtered
+  } catch (e) {
+    await debugLog("queryRecords: FAILED", { error: String(e) })
     return []
   }
 }
@@ -150,14 +193,14 @@ async function deleteExpired(db: any): Promise<void> {
 
 async function simpleEmbed(text: string): Promise<number[]> {
   const vector: number[] = []
-  const words = text.toLowerCase().split(/\s+/).slice(0, 100)
-  for (let i = 0; i < 768; i++) {
+  const words = text.toLowerCase().split(/\s+/).slice(0, 50)
+  for (let i = 0; i < 128; i++) {
     let sum = 0
     for (const word of words) {
       const charCodes = word.split('').map(c => c.charCodeAt(0))
       sum += charCodes[i % charCodes.length] * (i + 1) / 1000
     }
-    vector.push(Math.tanh(sum / words.length))
+    vector.push(Math.tanh(sum / Math.max(words.length, 1)))
   }
   return vector
 }
@@ -173,68 +216,65 @@ async function persistContext(
 ): Promise<void> {
   const redacted = redactSensitive(content)
   const vector = await simpleEmbed(redacted)
-  const record: ContextRecord = {
+  const now = Date.now()
+  const record = {
     id: generateId(),
     vector,
     projectId,
     contextType,
     content: redacted,
-    metadata,
+    metadata: JSON.stringify(metadata),
     sessionId,
-    createdAt: new Date().toISOString(),
-    expiresAt: getExpiry(contextType),
+    createdAt: now,
+    expiresAt: now + (90 * 24 * 60 * 60 * 1000),
     salience
   }
   await insertRecord(db, record)
 }
 
 export default async ({ project, client, directory }: Parameters<Plugin>[0]) => {
+  hookCalls = []
+  debugLogPath = join(directory, ".opencode", "plugins", "context-persistence-debug.log")
+  
+  await writeFile(debugLogPath, `=== NEW SESSION ${new Date().toISOString()} ===\n`)
+  await debugLog("Plugin initialized", { directory })
+
   globalConfig = await loadConfig(directory)
+  await debugLog("Config loaded", { enabled: globalConfig.enabled, lancedbPath: globalConfig.lancedbPath })
 
   if (!globalConfig.enabled) {
-    await client.app.log({
-      body: {
-        service: "context-persistence-plugin",
-        level: "info",
-        message: "Plugin disabled, skipping initialization",
-      },
-    })
-    return {}
+    await debugLog("Plugin DISABLED by config")
+    return {
+      "experimental.chat.system.transform": async (_input: any, output: any) => {
+        output.system.push(`[Context Persistence] DISABLED by config`)
+      }
+    }
   }
 
-  globalProjectId = createHash("sha256").update(directory).digest("hex").slice(0, 16)
+  globalProjectId = basename(directory)
+  await debugLog("ProjectId generated", { globalProjectId, directory })
 
   try {
-    globalDb = await initDatabase(globalConfig.lancedbPath)
+    globalDb = await initDatabase(globalConfig.lancedbPath, directory)
+    await debugLog("Database init result", { dbNull: globalDb === null, dbType: typeof globalDb })
 
     if (!globalDb) {
-      await client.app.log({
-        body: {
-          service: "context-persistence-plugin",
-          level: "warn",
-          message: "LanceDB not available - context persistence disabled. This is normal if @lancedb/lancedb is not installed.",
-        },
-      })
-      return {}
+      await debugLog("Database FAILED to initialize - returning empty hooks")
+      return {
+        "experimental.chat.system.transform": async (_input: any, output: any) => {
+          output.system.push(`[Context Persistence] LanceDB not available - check debug log at .opencode/plugins/context-persistence-debug.log`)
+        }
+      }
     }
 
-    await client.app.log({
-      body: {
-        service: "context-persistence-plugin",
-        level: "info",
-        message: `Context persistence plugin initialized`,
-        extra: { projectId: globalProjectId, dbPath: globalConfig.lancedbPath },
-      },
-    })
+    await debugLog("Database initialized successfully")
   } catch (error) {
-    await client.app.log({
-      body: {
-        service: "context-persistence-plugin",
-        level: "error",
-        message: `Failed to initialize: ${error}`,
-      },
-    })
-    return {}
+    await debugLog("Database init threw exception", { error: String(error), stack: (error as Error).stack })
+    return {
+      "experimental.chat.system.transform": async (_input: any, output: any) => {
+        output.system.push(`[Context Persistence] Init error: ${error}`)
+      }
+    }
   }
 
   const sessionData: SessionData = {
@@ -245,15 +285,23 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
   }
 
   return {
-    "experimental.chat.system.transform": async (_input, output) => {
-      if (!globalDb || !globalProjectId) return
+    "experimental.chat.system.transform": async (_input: any, output: any) => {
+      await debugLog("experimental.chat.system.transform: FIRED")
+
+      if (!globalDb || !globalProjectId) {
+        await debugLog("experimental.chat.system.transform: early return", { dbNull: globalDb === null, projectIdNull: globalProjectId === null })
+        return
+      }
 
       try {
         const records = await queryRecords(globalDb, 50, globalProjectId)
+        const now = Date.now()
         const results = records.filter(r => {
-          if (r.expiresAt && new Date(r.expiresAt) < new Date()) return false
+          if (r.expiresAt && r.expiresAt < now) return false
           return true
         })
+
+        await debugLog("experimental.chat.system.transform: query results", { recordsCount: records.length, validCount: results.length })
 
         if (results.length > 0) {
           const grouped: Record<string, string[]> = {}
@@ -281,43 +329,33 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
             grouped["file_change"].slice(0, 10).forEach(c => output.system.push(`- ${c}`))
           }
 
-          output.system.push(`---`)
+          if (grouped["command"]?.length) {
+            output.system.push(`## Recent Commands (${grouped["command"].length})`)
+            grouped["command"].slice(0, 10).forEach(c => output.system.push(`- ${c}`))
+          }
 
-          await client.app.log({
-            body: {
-              service: "context-persistence-plugin",
-              level: "debug",
-              message: `Injected ${results.length} context records into system prompt`,
-            },
-          })
+          output.system.push(`---`)
         }
       } catch (error) {
-        await client.app.log({
-          body: {
-            service: "context-persistence-plugin",
-            level: "error",
-            message: `Failed to retrieve context: ${error}`,
-          },
-        })
+        await debugLog("experimental.chat.system.transform: ERROR", { error: String(error) })
+        output.system.push(`[Context Persistence] Error: ${error}`)
       }
     },
 
-    "session.created": async (input) => {
+    "session.created": async (input: any) => {
+      await debugLog("session.created: FIRED", { input })
       if (input.session?.sessionId) {
         sessionData.sessionId = input.session.sessionId
       }
-
-      await client.app.log({
-        body: {
-          service: "context-persistence-plugin",
-          level: "info",
-          message: `Session created: ${sessionData.sessionId}`,
-        },
-      })
+      await debugLog("session.created: sessionId set", { sessionId: sessionData.sessionId })
     },
 
     "session.idle": async () => {
-      if (!globalDb || !globalProjectId) return
+      await debugLog("session.idle: FIRED", { filesCount: sessionData.filesEdited.length, commandsCount: sessionData.commands.length })
+      if (!globalDb || !globalProjectId) {
+        await debugLog("session.idle: early return - no db/projectId")
+        return
+      }
 
       try {
         for (const f of sessionData.filesEdited) {
@@ -347,29 +385,22 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
         }
 
         await deleteExpired(globalDb)
-
-        await client.app.log({
-          body: {
-            service: "context-persistence-plugin",
-            level: "info",
-            message: `Session persisted: ${sessionData.filesEdited.length} files, ${sessionData.commands.length} commands`,
-            extra: { sessionId: sessionData.sessionId },
-          },
-        })
+        await debugLog("session.idle: persisted successfully", { files: sessionData.filesEdited.length, commands: sessionData.commands.length })
       } catch (error) {
-        await client.app.log({
-          body: {
-            service: "context-persistence-plugin",
-            level: "error",
-            message: `Failed to persist session: ${error}`,
-          },
-        })
+        await debugLog("session.idle: ERROR", { error: String(error) })
       }
     },
 
-    "file.edited": async (input) => {
-      if (!input.filePath || !globalDb || !globalProjectId) return
-      if (shouldExclude(input.filePath)) return
+    "file.edited": async (input: any) => {
+      await debugLog("file.edited: FIRED", { filePath: input.filePath, hasDb: !!globalDb, hasProjectId: !!globalProjectId })
+      if (!input.filePath || !globalDb || !globalProjectId) {
+        await debugLog("file.edited: early return", { filePath: input.filePath, dbNull: globalDb === null, projectIdNull: globalProjectId === null })
+        return
+      }
+      if (shouldExclude(input.filePath)) {
+        await debugLog("file.edited: excluded by pattern", { filePath: input.filePath })
+        return
+      }
 
       try {
         sessionData.filesEdited.push({
@@ -387,26 +418,18 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
           globalConfig?.weights.file_change ?? 0.8
         )
 
-        await client.app.log({
-          body: {
-            service: "context-persistence-plugin",
-            level: "debug",
-            message: `File change recorded: ${input.filePath}`,
-          },
-        })
+        await debugLog("file.edited: recorded", { filePath: input.filePath })
       } catch (error) {
-        await client.app.log({
-          body: {
-            service: "context-persistence-plugin",
-            level: "error",
-            message: `Failed to persist file change: ${error}`,
-          },
-        })
+        await debugLog("file.edited: ERROR", { error: String(error) })
       }
     },
 
-    "command.executed": async (input) => {
-      if (!input.command || !globalDb || !globalProjectId) return
+    "command.executed": async (input: any) => {
+      await debugLog("command.executed: FIRED", { command: input.command, hasDb: !!globalDb, hasProjectId: !!globalProjectId })
+      if (!input.command || !globalDb || !globalProjectId) {
+        await debugLog("command.executed: early return")
+        return
+      }
 
       try {
         const result = input.result as { exitCode?: number; duration?: number } | undefined
@@ -427,21 +450,63 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
           globalConfig?.weights.command ?? 0.5
         )
 
-        await client.app.log({
-          body: {
-            service: "context-persistence-plugin",
-            level: "debug",
-            message: `Command recorded: ${input.command}`,
-          },
-        })
+        await debugLog("command.executed: recorded", { command: input.command })
       } catch (error) {
-        await client.app.log({
-          body: {
-            service: "context-persistence-plugin",
-            level: "error",
-            message: `Failed to persist command: ${error}`,
-          },
+        await debugLog("command.executed: ERROR", { error: String(error) })
+      }
+    },
+
+    "tool.execute.after": async (input: any, output: any) => {
+      await debugLog("tool.execute.after: FIRED", { tool: input?.tool, outputType: typeof output })
+      
+      if (!globalDb || !globalProjectId) {
+        await debugLog("tool.execute.after: no db/projectId")
+        return
+      }
+
+      const toolName = input?.tool
+      
+      if (toolName === "bash") {
+        const command = output?.args?.command || input?.args?.command || "unknown command"
+        await debugLog("tool.execute.after: bash command", { command })
+        
+        sessionData.commands.push({
+          command: String(command),
+          exitCode: 0,
+          duration: 0,
         })
+
+        await persistContext(
+          globalDb,
+          String(command),
+          "command",
+          sessionData.sessionId,
+          globalProjectId,
+          {},
+          globalConfig?.weights.command ?? 0.5
+        )
+      }
+      
+      if (toolName === "write" || toolName === "edit") {
+        const filePath = output?.args?.filePath || input?.args?.filePath
+        if (filePath && !shouldExclude(filePath)) {
+          await debugLog("tool.execute.after: file write", { filePath, tool: toolName })
+          
+          sessionData.filesEdited.push({
+            filePath,
+            changes: `File ${toolName === 'write' ? 'created' : 'edited'}`,
+          })
+
+          await persistContext(
+            globalDb,
+            `File ${toolName === 'write' ? 'created' : 'edited'}: ${filePath}`,
+            "file_change",
+            sessionData.sessionId,
+            globalProjectId,
+            { filePath },
+            globalConfig?.weights.file_change ?? 0.8
+          )
+        }
       }
     },
   }
