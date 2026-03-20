@@ -1,6 +1,6 @@
 # Context Persistence Plugin
 
-A plugin for OpenCode that maintains semantic continuity across coding sessions by persisting and retrieving codebase context through a vector database.
+A self-contained OpenCode plugin that maintains semantic continuity across coding sessions by persisting and retrieving codebase context through LanceDB.
 
 ## Features
 
@@ -10,50 +10,38 @@ A plugin for OpenCode that maintains semantic continuity across coding sessions 
 - **Sensitive Data Redaction**: Automatically filters API keys, passwords, and tokens
 - **Weighted Scoring**: Prioritizes important context (decisions > commands) with configurable weights
 - **Session Lifecycle Hooks**: Integrates with OpenCode's plugin architecture
+- **Self-Contained**: No external build required - single TypeScript file loaded by OpenCode
 
 ## Installation
 
-```bash
-# Clone and build
-git clone https://github.com/hoipippeloi/llmngn.xyz.git
-cd llmngn.xyz
-npm install
-npm run build
-
-# Install globally for CLI access
-npm link
-```
-
-## Quick Start
+### 1. Install Dependencies
 
 ```bash
-# Initialize the plugin
-context-persist init
-
-# Verify installation
-context-persist stats
+cd .opencode && bun install && cd ..
 ```
 
-### Configuration
+Or with npm:
+```bash
+cd .opencode && npm install && cd ..
+```
 
-Create `.opencode/plugins/context-persistence.json`:
+### 2. Configure (Optional)
+
+Edit `.opencode/plugins/context-persistence.json`:
 
 ```json
 {
   "enabled": true,
-  "embeddingModel": "nomic-embed-text",
-  "embeddingProvider": "local",
   "lancedbPath": ".lancedb",
   "maxContextTokens": 4096,
   "salienceDecay": 0.95,
   "retentionDays": 90,
-  "contextTypes": ["file_change", "decision", "debt", "task", "architecture", "command"],
   "weights": {
     "file_change": 0.8,
-    "decision": 1.0,
+    "decision": 1,
     "debt": 0.9,
     "task": 0.7,
-    "architecture": 1.0,
+    "architecture": 1,
     "command": 0.5
   },
   "filters": {
@@ -63,102 +51,97 @@ Create `.opencode/plugins/context-persistence.json`:
 }
 ```
 
-## CLI Commands
+### 3. Use
 
-| Command | Description |
-|---------|-------------|
-| `context-persist init` | Initialize plugin in current project |
-| `context-persist query <text>` | Query stored context semantically |
-| `context-persist history` | Show session history |
-| `context-persist stats` | Show database statistics |
-| `context-persist export` | Export context for backup |
-| `context-persist import <path>` | Import context from backup |
-| `context-persist purge --force` | Clear all stored context |
+Start OpenCode in the project directory. The plugin auto-loads and persists context automatically.
+
+## How It Works
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│   New Session   │────▶│  Plugin Hook    │────▶│  LanceDB        │
+│   Starts        │     │  Fires          │     │  Query          │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+                                                        │
+                        ┌─────────────────┐             ▼
+                        │  System Prompt  │◀──────── Context Records
+                        │  + Context      │     (decisions, changes)
+                        └─────────────────┘
+```
+
+## Files
+
+```
+.opencode/
+├── package.json                        # Dependencies
+└── plugins/
+    ├── context-persistence.ts          # Main plugin (self-contained)
+    └── context-persistence.json         # Configuration
+```
 
 ## Context Types and Priority
 
 | Type | Weight | Retention | Description |
 |------|--------|-----------|-------------|
 | `decision` | 1.0 | 180 days | Architectural decisions, library choices |
-| `architecture` | 1.0 | 365 days | Component relationships, system boundaries |
-| `debt` | 0.9 | Until resolved | Technical debt items |
-| `file_change` | 0.8 | 90 days | Significant file modifications |
-| `task` | 0.7 | 60 days | Task progress, blockers |
-| `command` | 0.5 | 30 days | Build commands, deployments |
+| `architecture` | 1.0 | 365 days | Component relationships |
+| `debt` | 0.9 | 90 days | Technical debt items |
+| `file_change` | 0.8 | 90 days | File modifications |
+| `task` | 0.7 | 60 days | Task progress |
+| `command` | 0.5 | 30 days | Build commands |
 
-## Programmatic Usage
-
-```typescript
-import { CLI, LanceDBClient, ContextRetriever, ContextPersister, createEmbeddingProvider } from 'context-persistence-plugin';
-
-const cli = new CLI(process.cwd());
-await cli.init({ embeddingModel: 'nomic-embed-text' });
-
-const results = await cli.query({ text: 'authentication logic', limit: 10 });
-const stats = await cli.stats();
-```
-
-## Architecture
-
-```
-src/
-├── index.ts              # Main exports
-├── cli.ts                # CLI entry point
-├── types/index.ts        # TypeScript interfaces
-├── database/
-│   └── client.ts         # LanceDB client
-├── embedding/
-│   └── embedding.ts      # Cloud/local embedding providers
-├── context/
-│   ├── persister.ts      # Context persistence logic
-│   └── retriever.ts      # Semantic retrieval with scoring
-├── hooks/
-│   └── plugin.ts         # OpenCode plugin hooks
-├── cli/
-│   └── index.ts          # CLI commands
-└── utils/
-    └── config.ts         # Configuration management
-```
-
-## OpenCode Hooks Integration
+## OpenCode Hooks
 
 | Hook | Purpose |
 |------|---------|
-| `session.created` | Inject relevant context from prior sessions |
-| `experimental.session.compacting` | Preserve critical context |
-| `session.idle` | Persist session summary |
-| `file.edited` | Log file modifications |
-| `command.executed` | Record command invocations |
-| `message.updated` | Capture architectural decisions |
-| `todo.updated` | Sync task progress |
-| `session.error` | Log error states as technical debt |
+| `experimental.chat.system.transform` | Inject context into system prompt |
+| `session.created` | Initialize session tracking |
+| `file.edited` | Record file changes |
+| `command.executed` | Record commands |
+| `session.idle` | Persist session to LanceDB |
 
-## Development
+## Configuration Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `enabled` | boolean | `true` | Enable/disable plugin |
+| `lancedbPath` | string | `".lancedb"` | Database storage path |
+| `maxContextTokens` | number | `4096` | Max tokens per injection |
+| `salienceDecay` | number | `0.95` | Weight for recent vs old |
+| `retentionDays` | number | `90` | Default retention |
+| `filters.excludePatterns` | string[] | `["**/node_modules/**", ...]` | Files to exclude |
+| `filters.sensitiveDataRedaction` | boolean | `true` | Redact secrets |
+
+## Troubleshooting
+
+### Plugin not loading
 
 ```bash
-# Build
-npm run build
+# Verify dependencies
+ls .opencode/node_modules/@lancedb
 
-# Watch mode
-npm run dev
-
-# Run tests
-npm test
-
-# Test coverage
-npm run test:coverage
-
-# Type check
-npm run typecheck
-
-# Lint
-npm run lint
+# Reinstall
+cd .opencode && bun install
 ```
+
+### Reset all context
+
+```bash
+rm -rf .lancedb
+```
+
+## Security
+
+- **Local-first**: All data stored locally
+- **Sensitive data redaction**: Filters API keys, passwords, tokens
+- **Project isolation**: Hashed project ID separates contexts
+- **No cloud sync**: Data never leaves your machine
 
 ## Requirements
 
 - Node.js 18+
-- OpenCode CLI (optional, for integration)
+- OpenCode CLI
+- Bun (for plugin dependencies)
 
 ## License
 
