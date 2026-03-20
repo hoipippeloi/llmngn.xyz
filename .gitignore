@@ -35,3 +35,10 @@ npm-debug.log*
 # Temp
 *.tmp
 *.temp
+
+# Project files
+.opencode/
+.specs/
+llm-prompt.md
+opencode-events.md
+prompts.md
