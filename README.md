@@ -14,7 +14,17 @@ Context persistence plugin for OpenCode that maintains semantic continuity acros
 
 ## Installation
 
-### 1. Install Dependencies
+### Quick Install
+
+Run this command in your project directory:
+
+```bash
+npx degit hoipippeloi/llmngn.xyz/.opencode .opencode && cd .opencode && bun install && cd ..
+```
+
+### Manual Installation
+
+#### 1. Install Dependencies
 
 ```bash
 cd .opencode && bun install && cd ..

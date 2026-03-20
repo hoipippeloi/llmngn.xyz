@@ -1,5 +1,19 @@
 # LLMNGN - Installation Guide
 
+## Quick Install (Recommended)
+
+Run this command in your project directory:
+
+```bash
+npx degit hoipippeloi/llmngn.xyz/.opencode .opencode && cd .opencode && bun install && cd ..
+```
+
+Or with curl (single command):
+
+```bash
+curl -sSL https://raw.githubusercontent.com/hoipippeloi/llmngn.xyz/main/scripts/install.js | node
+```
+
 ## Quick Install
 
 ```bash
