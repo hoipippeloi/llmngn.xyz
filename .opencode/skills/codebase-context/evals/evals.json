@@ -1,0 +1,99 @@
+{
+  "skill_name": "codebase-context",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I need to understand this codebase before adding a new feature. Create documentation that helps an LLM efficiently navigate the code structure.",
+      "expected_output": "CODEBASE_GRAPH.md, SEMANTIC_INDEX.md, and CONTEXT_GUIDE.md with symbol inventories, relationship mappings, and retrieval rules",
+      "files": ["src/", "package.json"],
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "CODEBASE_GRAPH.md",
+          "description": "Output should include codebase graph documentation"
+        },
+        {
+          "type": "contains",
+          "value": "SEMANTIC_INDEX.md",
+          "description": "Output should include semantic index documentation"
+        },
+        {
+          "type": "contains",
+          "value": "CONTEXT_GUIDE.md",
+          "description": "Output should include context retrieval guide"
+        },
+        {
+          "type": "contains",
+          "value": "symbol",
+          "description": "Documentation should catalog code symbols"
+        },
+        {
+          "type": "contains",
+          "value": "relationship",
+          "description": "Documentation should map symbol relationships"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "We're refactoring the authentication module. Document the call graph and dependencies so the LLM can understand all affected code.",
+      "expected_output": "Function call graph showing auth module dependencies, list of affected files, and token-efficient context snippets",
+      "files": ["src/auth/", "src/api/", "src/middleware/"],
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "call graph",
+          "description": "Output should include function call graph"
+        },
+        {
+          "type": "contains",
+          "value": "dependency",
+          "description": "Output should document module dependencies"
+        },
+        {
+          "type": "contains",
+          "value": "affected",
+          "description": "Output should identify affected files"
+        },
+        {
+          "type": "regex",
+          "value": "src/(auth|api|middleware)/",
+          "description": "Output should reference the specified module paths"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "This codebase is too large to fit in context. Create a retrieval strategy that lets the LLM work with specific modules without loading everything.",
+      "expected_output": "CONTEXT_GUIDE.md with selection rules, token budget allocation, and indexed symbol catalog for targeted retrieval",
+      "files": ["src/", "docs/"],
+      "assertions": [
+        {
+          "type": "contains",
+          "value": "retrieval",
+          "description": "Output should define retrieval strategy"
+        },
+        {
+          "type": "contains",
+          "value": "token",
+          "description": "Output should address token budget allocation"
+        },
+        {
+          "type": "contains",
+          "value": "selection",
+          "description": "Output should include context selection rules"
+        },
+        {
+          "type": "contains",
+          "value": "index",
+          "description": "Output should provide symbol indexing for lookup"
+        },
+        {
+          "type": "max_tokens",
+          "value": 5000,
+          "description": "Context delivery should stay within token limits"
+        }
+      ]
+    }
+  ]
+}

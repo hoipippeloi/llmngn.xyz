@@ -1,0 +1,111 @@
+{
+  "skill_name": "modern-frontend-design",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I'm building an AI writing assistant called InkFlow — it helps content creators write blog posts, social media captions, and newsletters using AI. I need a landing page that looks really modern and premium, something like how Linear or Raycast looks. It should have a hero with a live demo preview, a features section showing the different writing modes, pricing with 3 tiers (Free, Standard, Pro), and some testimonials. Dark theme with blue/purple accents. Use Next.js and Tailwind.",
+      "expected_output": "A complete Next.js + Tailwind dark-theme landing page with hero (display typography + demo preview), social proof logos, feature grid, 3-tier glassmorphism pricing cards with highlighted recommended tier, testimonials, final CTA, and responsive footer. Premium visual quality with consistent design system.",
+      "files": [],
+      "expectations": [
+        "Uses Next.js with TypeScript and Tailwind CSS",
+        "Dark theme with cohesive blue/purple color palette — not random neon colors",
+        "Hero section has display-size typography (48px+) with a visual demo or preview element",
+        "Features section shows at least 3 distinct writing modes with icons or visuals",
+        "Pricing section has exactly 3 tiers (Free, Standard, Pro) with one visually highlighted",
+        "Pricing cards use glassmorphism or premium card styling (not plain bordered boxes)",
+        "Testimonial section present with realistic placeholder content",
+        "Social proof section (logos or trust indicators) exists between hero and features",
+        "Responsive design with mobile breakpoints (hamburger nav, stacked cards)",
+        "Component-based architecture with separate files for major sections",
+        "Typography hierarchy is clear and uses negative letter-spacing on headings",
+        "Consistent spacing scale applied throughout (no arbitrary padding values)",
+        "Hover/focus states on interactive elements with smooth transitions",
+        "CTA buttons have visual prominence (gradient, glow, or strong contrast)"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "hey so i need a dashboard for my fintech startup — we do expense tracking for small businesses. the main view should show total spend, budget remaining, and some charts for spend by category. there's a sidebar with nav, a transactions table that can be filtered, and a top bar with search and the user's profile. make it look clean and professional, like something from a YC company. i don't care what framework, just make it look good",
+      "expected_output": "A fintech dashboard with sidebar navigation, top bar (search + profile), metric summary cards with trend indicators, category spend chart, and a filterable transactions table. Professional color palette with realistic placeholder data, loading states, and responsive layout.",
+      "files": [],
+      "expectations": [
+        "Dashboard layout with sidebar navigation (icon + label style)",
+        "Top bar with search input and user profile area (avatar or initials)",
+        "Summary metric cards showing total spend, budget remaining (with trend arrows or sparklines)",
+        "Chart or data visualization for spend by category (bar, donut, or area chart)",
+        "Transactions table with at least filter/sort capability",
+        "Professional color palette appropriate for fintech (blues, neutrals, greens for positive)",
+        "Realistic placeholder data — real-sounding company names, plausible dollar amounts",
+        "Loading skeleton states or empty states for async content areas",
+        "Responsive layout that adapts gracefully to smaller screens",
+        "Clean component organization with logical file separation",
+        "Consistent border-radius language throughout all cards and inputs",
+        "Proper semantic HTML (table, nav, main, aside elements used correctly)"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Build me a portfolio website for a freelance UI/UX designer named Aria Chen. It should showcase projects in a gallery-style grid, have an about section with her story, a contact form, and a blog listing page. I want it to feel creative and bold — big typography, maybe some scroll animations. Just use HTML, CSS, and vanilla JavaScript, no frameworks. Warm color palette, dark background.",
+      "expected_output": "A multi-section or multi-page portfolio using only HTML/CSS/JS with bold display typography, project gallery grid with hover effects, about section, working contact form, blog listing, scroll-triggered animations, and a warm creative color palette on dark background.",
+      "files": [],
+      "expectations": [
+        "Uses only HTML, CSS, and vanilla JavaScript — no frameworks or build tools",
+        "Project gallery with grid layout and visual hover effects (scale, overlay, or reveal)",
+        "About section with personality and realistic placeholder bio for Aria Chen",
+        "Contact form with proper input types, labels, and basic validation",
+        "Blog listing page or section with post previews",
+        "Bold display typography — heading sizes significantly larger than body (40px+)",
+        "Scroll-triggered animations using Intersection Observer or similar",
+        "Dark background with warm color palette (copper, gold, amber, or terracotta accents)",
+        "Responsive design that works on mobile (375px) and desktop (1440px)",
+        "Separate CSS and JS files — clean file structure",
+        "Consistent spacing scale visible throughout the design",
+        "Navigation with smooth scrolling or page links"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "I need a landing page for my AI customer support product called Orbita AI. It provides 24/7 multilingual chat support for global teams. The page needs: a hero section with a headline like 'Always-On AI Support for a Global Customer Base', trusted-by logos (Atlassian, Microsoft, Notion, Shopify, Slack), a 'why choose us' section with 3 benefit cards, a 'how it works' 4-step process, and a final CTA. Dark theme with green accents. Use React and Tailwind.",
+      "expected_output": "A premium React + Tailwind landing page with dark theme and green accents. Hero with globe/earth visual or gradient, logo bar, 3 benefit cards with icons, 4-step 'how it works' section, and final CTA. Resembles high-end AI SaaS marketing pages.",
+      "files": [],
+      "expectations": [
+        "Uses React with Tailwind CSS",
+        "Dark theme with green accent color system (not lime — professional green)",
+        "Hero section with display headline, subheadline, and two CTA buttons (primary + secondary)",
+        "Social proof logo bar showing at least 5 company logos with 'Trusted by X+ teams' text",
+        "Why/benefits section with exactly 3 cards, each having icon + headline + description",
+        "How-it-works section with 4 numbered steps and visual indicators",
+        "Final CTA section with strong headline and prominent action button",
+        "Navigation bar with logo, links, and Sign In / Get Started buttons",
+        "Footer with proper link columns and social links",
+        "Responsive design — hero stacks vertically on mobile, cards go single-column",
+        "Smooth hover effects on cards and buttons with transition timing",
+        "Typography hierarchy with display > h2 > body clearly differentiated",
+        "Section padding follows a consistent vertical rhythm (80px+ on desktop)",
+        "Gradient or glow effects used subtly in hero or background elements"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Build a modern pricing page for a design tool called Forma AI. Three plans: Free ($0), Standard ($9.99/m), and Pro ($19.99/m). Free gets: 3 cloud projects, 1080p export, basic editing, free templates, web + mobile access. Standard gets: 50 cloud projects, 4K export, advanced editing, team collab (5 members), premium templates. Pro gets: unlimited projects, 8K + animations export, AI content gen, unlimited team, brand customization. Include a monthly/yearly toggle. Dark background with glassmorphism cards. Use any modern stack.",
+      "expected_output": "A standalone pricing page with dark background, 3 glassmorphism pricing cards, monthly/yearly toggle, feature lists with checkmarks, and 'Choose Plan' CTAs. Premium visual quality matching modern SaaS pricing sections.",
+      "files": [],
+      "expectations": [
+        "Three pricing tiers displayed: Free, Standard, Pro with correct prices",
+        "Monthly/Yearly toggle switch that updates displayed prices",
+        "Each card lists the correct features as specified in the prompt",
+        "Glassmorphism card styling — backdrop-blur, translucent backgrounds, subtle borders",
+        "Dark background with depth (gradient, subtle patterns, or color bleed)",
+        "One tier visually highlighted as recommended (larger, glowing border, or badge)",
+        "Consistent checkmark or icon next to each feature item",
+        "'Choose Plan' or equivalent CTA button on each card",
+        "Navigation bar at top with logo and menu links",
+        "Responsive — cards stack vertically on mobile",
+        "Typography hierarchy: plan name > price > description > features",
+        "Smooth hover effects on cards (subtle scale or glow)",
+        "Price typography is prominent (large, bold, distinct from feature text)",
+        "Visual flow guides eye from Free → Standard → Pro (left to right, or progressive emphasis)"
+      ]
+    }
+  ]
+}

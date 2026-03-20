@@ -1,0 +1,423 @@
+{
+  "project": "context-persistence-plugin",
+  "spec": ".specs/context-persistence-plugin/spec.md",
+  "developmentMethodology": "TDD (RED-GREEN-REFACTOR cycle)",
+  "tasks": [
+    {
+      "id": "setup-001",
+      "phase": "Setup",
+      "title": "Initialize project structure",
+      "description": "Create CLI application scaffold using Crust framework with TypeScript configuration",
+      "acceptanceCriteria": [
+        "TDD: Write test for CLI command parsing before implementation",
+        "TDD: Test fails when Crust configuration is missing",
+        "TDD: Refactor after test passes"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "mapsTo": "Setup Phase"
+    },
+    {
+      "id": "setup-002",
+      "phase": "Setup",
+      "title": "Configure LanceDB integration",
+      "description": "Set up LanceDB connection and database initialization logic",
+      "acceptanceCriteria": [
+        "TDD: Write test for database initialization before implementation",
+        "TDD: Test fails when LanceDB connection fails",
+        "TDD: Refactor after test passes"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "mapsTo": "Setup Phase"
+    },
+    {
+      "id": "setup-003",
+      "phase": "Setup",
+      "title": "Create embedding service abstraction",
+      "description": "Implement embedding service interface with support for cloud and local providers",
+      "acceptanceCriteria": [
+        "TDD: Write test for embedding service interface before implementation",
+        "TDD: Test fails when embedding provider is not configured",
+        "TDD: Refactor after test passes"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "mapsTo": "Setup Phase"
+    },
+    {
+      "id": "core-001",
+      "phase": "Core Functionality",
+      "title": "Implement LanceDB schema definition",
+      "description": "FR-1: Define vector table schema with fields: id, vector, project_id, context_type, content, metadata, session_id, created_at, expires_at, salience",
+      "acceptanceCriteria": [
+        "TDD: Write test for schema creation before implementation",
+        "TDD: Test fails when schema fields are missing",
+        "TDD: Refactor after test passes"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "mapsTo": "FR-1"
+    },
+    {
+      "id": "core-002",
+      "phase": "Core Functionality",
+      "title": "Implement pre-session context retrieval",
+      "description": "FR-2: Query LanceDB for relevant semantic data and inject into LLM session context",
+      "acceptanceCriteria": [
+        "TDD: Write test for context retrieval query before implementation",
+        "TDD: Test fails when no context is retrieved",
+        "TDD: Refactor after test passes"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "mapsTo": "FR-2"
+    },
+    {
+      "id": "core-003",
+      "phase": "Core Functionality",
+      "title": "Implement post-session context persistence",
+      "description": "FR-3: Extract session summary and persist to LanceDB with embeddings",
+      "acceptanceCriteria": [
+        "TDD: Write test for context extraction before implementation",
+        "TDD: Test fails when context is not persisted",
+        "TDD: Refactor after test passes"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "mapsTo": "FR-3"
+    },
+    {
+      "id": "core-004",
+      "phase": "Core Functionality",
+      "title": "Implement OpenCode plugin hook integration",
+      "description": "FR-4: Register hooks for session.created, session.idle, file.edited, command.executed, tool.execute.after, message.updated, todo.updated",
+      "acceptanceCriteria": [
+        "TDD: Write test for hook registration before implementation",
+        "TDD: Test fails when hooks are not triggered",
+        "TDD: Refactor after test passes"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "mapsTo": "FR-4"
+    },
+    {
+      "id": "core-005",
+      "phase": "Core Functionality",
+      "title": "Implement context weighting algorithm",
+      "description": "FR-5: Calculate priority scores using cosine similarity, type weight, recency decay, and manual salience",
+      "acceptanceCriteria": [
+        "TDD: Write test for scoring algorithm before implementation",
+        "TDD: Test fails when score calculation is incorrect",
+        "TDD: Refactor after test passes"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "mapsTo": "FR-5"
+    },
+    {
+      "id": "core-006",
+      "phase": "Core Functionality",
+      "title": "Implement context window management",
+      "description": "FR-6: Truncate context to maxContextTokens (default 4096) while preserving highest-priority records",
+      "acceptanceCriteria": [
+        "TDD: Write test for token truncation before implementation",
+        "TDD: Test fails when context exceeds token limit",
+        "TDD: Refactor after test passes"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "mapsTo": "FR-6"
+    },
+    {
+      "id": "core-007",
+      "phase": "Core Functionality",
+      "title": "Implement semantic deduplication",
+      "description": "FR-7: Detect and merge records with cosine similarity > 0.95, keeping most recent",
+      "acceptanceCriteria": [
+        "TDD: Write test for deduplication logic before implementation",
+        "TDD: Test fails when duplicates are not detected",
+        "TDD: Refactor after test passes"
+      ],
+      "priority": 2,
+      "status": "pending",
+      "mapsTo": "FR-7"
+    },
+    {
+      "id": "error-001",
+      "phase": "Error Handling",
+      "title": "Implement embedding failure recovery",
+      "description": "Edge Cases: Retry with exponential backoff, use cached vectors, queue for batch, fallback to local model",
+      "acceptanceCriteria": [
+        "TDD: Write test for failure recovery before implementation",
+        "TDD: Test fails when recovery strategies are not attempted",
+        "TDD: Refactor after test passes"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "mapsTo": "Edge Cases"
+    },
+    {
+      "id": "error-002",
+      "phase": "Error Handling",
+      "title": "Implement database corruption recovery",
+      "description": "Edge Cases: Detect corruption, create new DB, notify user, restore from backup",
+      "acceptanceCriteria": [
+        "TDD: Write test for corruption detection before implementation",
+        "TDD: Test fails when corruption is not detected",
+        "TDD: Refactor after test passes"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "mapsTo": "Edge Cases"
+    },
+    {
+      "id": "error-003",
+      "phase": "Error Handling",
+      "title": "Implement sensitive data redaction",
+      "description": "Edge Cases: Filter API keys, passwords, secrets from stored content using regex patterns",
+      "acceptanceCriteria": [
+        "TDD: Write test for redaction before implementation",
+        "TDD: Test fails when sensitive data is not redacted",
+        "TDD: Refactor after test passes"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "mapsTo": "Edge Cases"
+    },
+    {
+      "id": "error-004",
+      "phase": "Error Handling",
+      "title": "Implement graceful degradation",
+      "description": "Edge Cases: Continue session when context unavailable, log warnings, skip persistence",
+      "acceptanceCriteria": [
+        "TDD: Write test for degradation behavior before implementation",
+        "TDD: Test fails when session continues without context",
+        "TDD: Refactor after test passes"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "mapsTo": "Edge Cases"
+    },
+    {
+      "id": "cli-001",
+      "phase": "CLI",
+      "title": "Implement init command",
+      "description": "CLI: context-persist init [--embedding-model <model>] - Initialize plugin in current project",
+      "acceptanceCriteria": [
+        "TDD: Write test for init command before implementation",
+        "TDD: Test fails when command does not create config",
+        "TDD: Refactor after test passes"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "mapsTo": "CLI Commands"
+    },
+    {
+      "id": "cli-002",
+      "phase": "CLI",
+      "title": "Implement query command",
+      "description": "CLI: context-persist query <text> [--limit <n>] [--type <type>] - Query stored context",
+      "acceptanceCriteria": [
+        "TDD: Write test for query command before implementation",
+        "TDD: Test fails when query returns no results",
+        "TDD: Refactor after test passes"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "mapsTo": "CLI Commands"
+    },
+    {
+      "id": "cli-003",
+      "phase": "CLI",
+      "title": "Implement history command",
+      "description": "CLI: context-persist history [--sessions <n>] - Show session history",
+      "acceptanceCriteria": [
+        "TDD: Write test for history command before implementation",
+        "TDD: Test fails when history is not displayed",
+        "TDD: Refactor after test passes"
+      ],
+      "priority": 2,
+      "status": "pending",
+      "mapsTo": "CLI Commands"
+    },
+    {
+      "id": "cli-004",
+      "phase": "CLI",
+      "title": "Implement export/import commands",
+      "description": "CLI: context-persist export [--output <path>] and import <path> - Backup and restore context",
+      "acceptanceCriteria": [
+        "TDD: Write test for export/import before implementation",
+        "TDD: Test fails when data is not exported/imported correctly",
+        "TDD: Refactor after test passes"
+      ],
+      "priority": 2,
+      "status": "pending",
+      "mapsTo": "CLI Commands"
+    },
+    {
+      "id": "cli-005",
+      "phase": "CLI",
+      "title": "Implement purge command",
+      "description": "CLI: context-persist purge [--force] - Clear stored context",
+      "acceptanceCriteria": [
+        "TDD: Write test for purge command before implementation",
+        "TDD: Test fails when database is not cleared",
+        "TDD: Refactor after test passes"
+      ],
+      "priority": 2,
+      "status": "pending",
+      "mapsTo": "CLI Commands"
+    },
+    {
+      "id": "cli-006",
+      "phase": "CLI",
+      "title": "Implement stats command",
+      "description": "CLI: context-persist stats - Show database statistics",
+      "acceptanceCriteria": [
+        "TDD: Write test for stats command before implementation",
+        "TDD: Test fails when statistics are not displayed",
+        "TDD: Refactor after test passes"
+      ],
+      "priority": 2,
+      "status": "pending",
+      "mapsTo": "CLI Commands"
+    },
+    {
+      "id": "config-001",
+      "phase": "Configuration",
+      "title": "Implement configuration file parser",
+      "description": "Parse and validate .opencode/plugins/context-persistence.json configuration",
+      "acceptanceCriteria": [
+        "TDD: Write test for config parsing before implementation",
+        "TDD: Test fails when invalid config is not rejected",
+        "TDD: Refactor after test passes"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "mapsTo": "Configuration"
+    },
+    {
+      "id": "config-002",
+      "phase": "Configuration",
+      "title": "Implement CLI config subcommands",
+      "description": "CLI: context-persist config set/get/list - Manage configuration",
+      "acceptanceCriteria": [
+        "TDD: Write test for config commands before implementation",
+        "TDD: Test fails when config is not updated",
+        "TDD: Refactor after test passes"
+      ],
+      "priority": 2,
+      "status": "pending",
+      "mapsTo": "Configuration"
+    },
+    {
+      "id": "migration-001",
+      "phase": "Migration",
+      "title": "Implement schema versioning",
+      "description": "Track schema version and support migrations between versions",
+      "acceptanceCriteria": [
+        "TDD: Write test for version tracking before implementation",
+        "TDD: Test fails when version is not tracked",
+        "TDD: Refactor after test passes"
+      ],
+      "priority": 2,
+      "status": "pending",
+      "mapsTo": "Versioning"
+    },
+    {
+      "id": "migration-002",
+      "phase": "Migration",
+      "title": "Implement warmup strategy for existing codebases",
+      "description": "Phase adoption: discovery (write-only) → warming → active (read-write)",
+      "acceptanceCriteria": [
+        "TDD: Write test for warmup phases before implementation",
+        "TDD: Test fails when phases are not enforced",
+        "TDD: Refactor after test passes"
+      ],
+      "priority": 3,
+      "status": "pending",
+      "mapsTo": "Migration Path"
+    },
+    {
+      "id": "observability-001",
+      "phase": "Observability",
+      "title": "Implement structured logging",
+      "description": "Log all operations in JSON format with timestamp, level, event, sessionId, metrics",
+      "acceptanceCriteria": [
+        "TDD: Write test for logging format before implementation",
+        "TDD: Test fails when logs are not structured correctly",
+        "TDD: Refactor after test passes"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "mapsTo": "Observability"
+    },
+    {
+      "id": "observability-002",
+      "phase": "Observability",
+      "title": "Implement metrics collection",
+      "description": "Track query latency, embedding success rate, database growth, token count, deduplication ratio",
+      "acceptanceCriteria": [
+        "TDD: Write test for metrics collection before implementation",
+        "TDD: Test fails when metrics are not recorded",
+        "TDD: Refactor after test passes"
+      ],
+      "priority": 2,
+      "status": "pending",
+      "mapsTo": "Observability"
+    },
+    {
+      "id": "test-001",
+      "phase": "Testing",
+      "title": "Write unit tests for core logic",
+      "description": "Unit tests for embedding service, query builder, weighting algorithm, deduplication, redaction",
+      "acceptanceCriteria": [
+        "TDD: Write test for test structure before implementation",
+        "TDD: Test fails when coverage is below 80%",
+        "TDD: Refactor after test passes"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "mapsTo": "Testing Strategy"
+    },
+    {
+      "id": "test-002",
+      "phase": "Testing",
+      "title": "Write integration tests",
+      "description": "Integration tests for full session lifecycle, context retrieval, corruption recovery, failure handling",
+      "acceptanceCriteria": [
+        "TDD: Write test for integration setup before implementation",
+        "TDD: Test fails when integration scenarios fail",
+        "TDD: Refactor after test passes"
+      ],
+      "priority": 1,
+      "status": "pending",
+      "mapsTo": "Testing Strategy"
+    },
+    {
+      "id": "test-003",
+      "phase": "Testing",
+      "title": "Write E2E tests",
+      "description": "E2E tests for cold start, warm start, multi-session, cross-project, failure recovery",
+      "acceptanceCriteria": [
+        "TDD: Write test for E2E framework before implementation",
+        "TDD: Test fails when E2E flows fail",
+        "TDD: Refactor after test passes"
+      ],
+      "priority": 2,
+      "status": "pending",
+      "mapsTo": "Testing Strategy"
+    }
+  ],
+  "tddWorkflow": {
+    "enforced": true,
+    "cycle": "RED-GREEN-REFACTOR",
+    "rules": [
+      "Write test first (RED) - test must fail",
+      "Write minimal code to pass (GREEN) - no optimization",
+      "Refactor after test passes (REFACTOR) - maintain quality",
+      "All tasks must follow TDD cycle as acceptance criteria"
+    ]
+  }
+}
