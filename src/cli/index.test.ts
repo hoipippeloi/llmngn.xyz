@@ -60,6 +60,35 @@ describe('CLI', () => {
     })
   })
 
+  describe('add', () => {
+    it('should add context record', async () => {
+      await cli.init({})
+      
+      const result = await cli.add({ content: 'Test decision' })
+      expect(result.id).toBeDefined()
+      expect(mocks.insert).toHaveBeenCalled()
+    })
+
+    it('should add record with custom type', async () => {
+      await cli.init({})
+      
+      await cli.add({ content: 'Test command', type: 'command' })
+      expect(mocks.insert).toHaveBeenCalled()
+      const inserted = mocks.insert.mock.calls[0][0]
+      expect(inserted.contextType).toBe('command')
+    })
+
+    it('should add record with metadata', async () => {
+      await cli.init({})
+      
+      await cli.add({ 
+        content: 'Test', 
+        metadata: '{"file":"test.ts"}' 
+      })
+      expect(mocks.insert).toHaveBeenCalled()
+    })
+  })
+
   describe('query', () => {
     it('should query context with text', async () => {
       await cli.init({})

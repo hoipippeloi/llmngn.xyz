@@ -5,7 +5,6 @@ CLI for managing the LLMNGN context database.
 ## Installation
 
 ```bash
-# Clone repo and link CLI globally
 git clone https://github.com/hoipippeloi/llmngn.xyz.git
 cd llmngn.xyz && npm install && npm link
 ```
@@ -15,6 +14,7 @@ cd llmngn.xyz && npm install && npm link
 | Command | Description |
 |---------|-------------|
 | `llmngn init` | Initialize plugin in current project |
+| `llmngn add <content>` | Add context record manually |
 | `llmngn query <text>` | Search stored context |
 | `llmngn history` | View session history |
 | `llmngn stats` | Show database statistics |
@@ -23,62 +23,57 @@ cd llmngn.xyz && npm install && npm link
 | `llmngn purge --force` | Delete all stored context |
 | `llmngn config list` | Show all settings |
 | `llmngn config set <key> <value>` | Update setting |
-| `llmngn config get <key>` | Get setting value |
 
-## Options
+## add
 
-### query
+```bash
+llmngn add <content> [--type type] [--session id] [--metadata json]
 ```
+
+**Options:**
+- `-t, --type` - Context type: `decision`, `file_change`, `command`, `task`, `debt`, `architecture` (default: decision)
+- `-s, --session` - Session ID (auto-generated if not provided)
+- `-m, --metadata` - Additional metadata as JSON string
+
+## query
+
+```bash
 llmngn query <text> [--limit n] [--types type1,type2]
 ```
 
-### export
-```
-llmngn export [--output file]
-```
+## export/import
 
-### import
-```
+```bash
+llmngn export [-o file]
 llmngn import <file>
-```
-
-### purge
-```
-llmngn purge --force
 ```
 
 ## Examples
 
 ```bash
-# Initialize in a new project
-llmngn init
+# Add a decision
+llmngn add "Use Redis for session caching" --type decision
 
-# Search for past decisions
+# Add with metadata
+llmngn add "Refactored auth module" --type file_change --metadata '{"file":"src/auth.ts"}'
+
+# Search context
 llmngn query "authentication" --types decision --limit 10
 
-# View recent sessions
+# View history
 llmngn history --sessions 5
 
-# Check database size
-llmngn stats
+# Backup
+llmngn export -o backup.json
 
-# Backup before refactor
-llmngn export --output backup.json
-
-# Restore from backup
-llmngn import backup.json
-
-# Update retention days
-llmngn config set retentionDays 120
-
-# Clear everything
+# Clear all
 llmngn purge --force
 ```
 
 ## Development
 
 ```bash
-npm run build      # Compile TypeScript
+npm run build      # Compile
 npm run typecheck  # Type check
 npm test           # Run tests
 ```

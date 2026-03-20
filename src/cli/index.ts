@@ -3,12 +3,20 @@ import { LanceDBClient } from '../database/client.js'
 import { createEmbeddingProvider } from '../embedding/embedding.js'
 import { ContextRetriever } from '../context/retriever.js'
 import { ConfigManager } from '../utils/config.js'
-import type { PluginConfig, ContextType } from '../types/index.js'
+import type { PluginConfig, ContextType, ContextRecord } from '../types/index.js'
 import { readFile, writeFile } from 'fs/promises'
 import { createHash } from 'crypto'
+import { v4 as uuidv4 } from 'uuid'
 
 export interface InitOptions {
   embeddingModel?: string
+}
+
+export interface AddOptions {
+  content: string
+  type?: ContextType
+  session?: string
+  metadata?: string
 }
 
 export interface QueryOptions {
@@ -65,6 +73,46 @@ export class CLI {
     const dbPath = config.lancedbPath
     this.db = new LanceDBClient(dbPath)
     await this.db.initialize()
+  }
+
+  async add(options: AddOptions): Promise<{ id: string }> {
+    const { db, config } = await this.initialize()
+    
+    const embedder = createEmbeddingProvider({
+      provider: config.embeddingProvider,
+      model: config.embeddingModel,
+      apiKey: config.apiKey
+    })
+
+    const embedding = await embedder.encode(options.content)
+    const projectId = this.getProjectId()
+    const contextType = options.type ?? 'decision'
+    const sessionId = options.session ?? `cli-${Date.now()}`
+    
+    let metadata = {}
+    if (options.metadata) {
+      try {
+        metadata = JSON.parse(options.metadata)
+      } catch {
+        metadata = { note: options.metadata }
+      }
+    }
+
+    const record: ContextRecord = {
+      id: uuidv4(),
+      vector: embedding.vector,
+      projectId,
+      contextType,
+      content: options.content,
+      metadata: metadata as ContextRecord['metadata'],
+      sessionId,
+      createdAt: new Date().toISOString(),
+      salience: config.weights[contextType] ?? 1.0
+    }
+
+    await db.insert(record)
+    
+    return { id: record.id }
   }
 
   async query(options: QueryOptions): Promise<Array<{ id: string; type: string; content: string; score: number }>> {
@@ -259,6 +307,22 @@ export function createProgram(cli: CLI): Command {
     .action(async (options) => {
       await cli.init(options)
       console.log('LLMNGN initialized')
+    })
+
+  program
+    .command('add <content>')
+    .description('Add context record manually')
+    .option('-t, --type <type>', 'Context type (decision, file_change, command, etc.)', 'decision')
+    .option('-s, --session <id>', 'Session ID')
+    .option('-m, --metadata <json>', 'Metadata as JSON string')
+    .action(async (content, options) => {
+      const result = await cli.add({
+        content,
+        type: options.type as ContextType,
+        session: options.session,
+        metadata: options.metadata
+      })
+      console.log(JSON.stringify(result, null, 2))
     })
 
   program
