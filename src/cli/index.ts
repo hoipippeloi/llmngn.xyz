@@ -1,5 +1,5 @@
 import { Command } from 'commander'
-import { LanceDBClient } from '../database/client.js'
+import { LanceDBClient, SCHEMA_VERSION } from '../database/client.js'
 import { createEmbeddingProvider } from '../embedding/embedding.js'
 import { ContextRetriever } from '../context/retriever.js'
 import { ConfigManager } from '../utils/config.js'
@@ -449,6 +449,15 @@ This plugin maintains semantic continuity across coding sessions by storing and 
     return db.deleteExpired()
   }
 
+  async schema(): Promise<{ version: string; valid: boolean; message: string; fields?: string[] }> {
+    const { db } = await this.initialize()
+    const result = await db.validateSchema()
+    return {
+      version: SCHEMA_VERSION,
+      ...result
+    }
+  }
+
   async configSet(key: string, value: string): Promise<void> {
     const config = await this.configManager.load()
     
@@ -649,6 +658,14 @@ export function createProgram(cli: CLI): Command {
     .action(async () => {
       const count = await cli.clean()
       console.log(JSON.stringify({ deleted: count }, null, 2))
+    })
+
+  program
+    .command('schema')
+    .description('Validate database schema')
+    .action(async () => {
+      const result = await cli.schema()
+      console.log(JSON.stringify(result, null, 2))
     })
 
   program

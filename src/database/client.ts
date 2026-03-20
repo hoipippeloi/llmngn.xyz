@@ -1,10 +1,15 @@
 import * as lancedb from '@lancedb/lancedb'
 import type { ContextRecord, ContextType } from '../types/index.js'
+import { SCHEMA_VERSION, SCHEMA_FIELDS, DB_FIELD_NAMES, toDBRow, fromDBRow } from './schema.js'
+
+export { SCHEMA_VERSION, SCHEMA_FIELDS, DB_FIELD_NAMES, toDBRow, fromDBRow }
 
 interface DBStats {
   recordCount: number
   sizeBytes: number
 }
+
+const VECTOR_SIZE = 768
 
 export class LanceDBClient {
   private db: lancedb.Connection | null = null
@@ -21,24 +26,50 @@ export class LanceDBClient {
     
     const tableNames = await this.db.tableNames()
     
-    // Create table with proper vector column - all fields must have non-null values for arrow infer
     const initialRecord = {
       id: '__init__',
-      vector: new Array(768).fill(0).map(() => Math.random() * 0.01),
-      project_id: '',
-      context_type: 'file_change',
-      content: '',
-      metadata: '{}',
-      session_id: '',
-      created_at: Date.now(),
-      expires_at: Date.now() + 365 * 24 * 60 * 60 * 1000, // 1 year from now
-      salience: 1.0
+      vector: new Array(VECTOR_SIZE).fill(0).map(() => Math.random() * 0.01),
+      [DB_FIELD_NAMES.projectId]: '',
+      [DB_FIELD_NAMES.contextType]: 'file_change',
+      [DB_FIELD_NAMES.content]: '',
+      [DB_FIELD_NAMES.metadata]: '{}',
+      [DB_FIELD_NAMES.sessionId]: '',
+      [DB_FIELD_NAMES.createdAt]: Date.now(),
+      [DB_FIELD_NAMES.expiresAt]: Date.now() + 365 * 24 * 60 * 60 * 1000,
+      [DB_FIELD_NAMES.salience]: 1.0
     }
     
     if (!tableNames.includes(this.tableName)) {
       this.table = await this.db.createTable(this.tableName, [initialRecord])
     } else {
       this.table = await this.db.openTable(this.tableName)
+    }
+  }
+  
+  async validateSchema(): Promise<{ valid: boolean; message: string; fields?: string[] }> {
+    if (!this.table) {
+      return { valid: false, message: 'Database not initialized' }
+    }
+    
+    try {
+      const schema = await this.table.schema()
+      const dbFields = schema.fields.map(f => f.name).sort()
+      const expectedFields = [...SCHEMA_FIELDS].sort()
+      
+      const missing = expectedFields.filter((f: string) => !dbFields.includes(f))
+      const unexpected = dbFields.filter((f: string) => !expectedFields.includes(f))
+      
+      if (missing.length === 0 && unexpected.length === 0) {
+        return { valid: true, message: `Schema v${SCHEMA_VERSION} valid`, fields: dbFields }
+      }
+      
+      let message = `Schema mismatch (expected v${SCHEMA_VERSION})`
+      if (missing.length > 0) message += ` - missing: ${missing.join(', ')}`
+      if (unexpected.length > 0) message += ` - unexpected: ${unexpected.join(', ')}`
+      
+      return { valid: false, message, fields: dbFields }
+    } catch (e) {
+      return { valid: false, message: `Schema validation error: ${e}` }
     }
   }
 
@@ -54,39 +85,19 @@ export class LanceDBClient {
       throw new Error('Database not initialized')
     }
 
-    const row = {
-      id: record.id,
-      vector: record.vector,
-      project_id: record.projectId,
-      context_type: record.contextType,
-      content: record.content,
-      metadata: JSON.stringify(record.metadata),
-      session_id: record.sessionId,
-      created_at: new Date(record.createdAt).getTime(),
-      expires_at: record.expiresAt ? new Date(record.expiresAt).getTime() : Date.now() + 365 * 24 * 60 * 60 * 1000,
-      salience: record.salience
-    }
-
+    const row = toDBRow({
+      ...record,
+      metadata: record.metadata as Record<string, unknown>
+    })
     await this.table.add([row])
   }
 
   private mapRecord(r: Record<string, unknown>): ContextRecord {
-    const expiresAt = r['expires_at'] as number | undefined
-    const createdAtVal = r['created_at'] as number | undefined
-    
+    const mapped = fromDBRow(r)
     return {
-      id: r['id'] as string,
-      vector: r['vector'] as number[],
-      projectId: r['project_id'] as string,
-      contextType: r['context_type'] as ContextType,
-      content: r['content'] as string,
-      metadata: JSON.parse(r['metadata'] as string || '{}'),
-      sessionId: r['session_id'] as string,
-      createdAt: createdAtVal ? new Date(createdAtVal).toISOString() : new Date().toISOString(),
-      expiresAt: expiresAt && expiresAt < Date.now() + 300 * 24 * 60 * 60 * 1000 
-        ? new Date(expiresAt).toISOString() 
-        : undefined,
-      salience: (r['salience'] as number) ?? 1.0
+      ...mapped,
+      contextType: mapped.contextType as ContextType,
+      metadata: mapped.metadata as ContextRecord['metadata']
     }
   }
 
@@ -126,7 +137,7 @@ export class LanceDBClient {
 
     const now = Date.now()
     const results = await this.table.query()
-      .where(`expires_at < ${now}`)
+      .where(`${DB_FIELD_NAMES.expiresAt} < ${now}`)
       .toArray()
     
     if (results.length === 0) {
@@ -184,10 +195,10 @@ export class LanceDBClient {
     let query = this.table.query()
 
     if (options.type) {
-      query = query.where(`context_type = '${options.type}'`) as any
+      query = query.where(`${DB_FIELD_NAMES.contextType} = '${options.type}'`) as any
     }
     if (options.sessionId) {
-      query = query.where(`session_id = '${options.sessionId}'`) as any
+      query = query.where(`${DB_FIELD_NAMES.sessionId} = '${options.sessionId}'`) as any
     }
 
     const results = await query.limit(options.limit ?? 100).toArray()

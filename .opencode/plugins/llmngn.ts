@@ -2,6 +2,26 @@ import type { Plugin } from "@opencode-ai/plugin"
 import { readFile, mkdir, appendFile, writeFile } from "fs/promises"
 import { join, basename } from "path"
 
+// Schema constants - MUST match src/database/schema.ts
+// Update both files when changing schema
+const SCHEMA_VERSION = '1.0.0'
+const VECTOR_SIZE = 768
+
+const DB_FIELD = {
+  id: 'id',
+  vector: 'vector',
+  projectId: 'project_id',
+  contextType: 'context_type',
+  content: 'content',
+  metadata: 'metadata',
+  sessionId: 'session_id',
+  createdAt: 'created_at',
+  expiresAt: 'expires_at',
+  salience: 'salience'
+} as const
+
+const EXPECTED_SCHEMA_FIELDS = Object.values(DB_FIELD)
+
 const REDACTION_PATTERNS = [
   /API_KEY=\S+/gi,
   /api[_-]?key[:\s]*=\s*\S+/gi,
@@ -41,6 +61,19 @@ interface ContextRecord {
   createdAt: number
   expiresAt: number
   salience: number
+}
+
+interface DBRow {
+  id: string
+  vector: number[]
+  [DB_FIELD.projectId]: string
+  [DB_FIELD.contextType]: string
+  [DB_FIELD.content]: string
+  [DB_FIELD.metadata]: string
+  [DB_FIELD.sessionId]: string
+  [DB_FIELD.createdAt]: number
+  [DB_FIELD.expiresAt]: number
+  [DB_FIELD.salience]: number
 }
 
 interface SessionData {
@@ -136,10 +169,47 @@ async function initDatabase(dbPath: string, directory: string): Promise<any> {
   }
 }
 
-async function insertRecord(db: any, record: ContextRecord): Promise<void> {
+async function validateSchema(db: any): Promise<{ valid: boolean; message: string }> {
   try {
     const table = await db.openTable("llmngn_context")
-    await table.add([record])
+    const schema = await table.schema()
+    const dbFields = schema.fields.map((f: any) => f.name).sort()
+    const expectedFields = [...EXPECTED_SCHEMA_FIELDS].sort() as string[]
+    
+    const missing = expectedFields.filter(f => !dbFields.includes(f))
+    const unexpected = dbFields.filter((f: string) => !expectedFields.includes(f))
+    
+    if (missing.length === 0 && unexpected.length === 0) {
+      return { valid: true, message: `Schema v${SCHEMA_VERSION} valid` }
+    }
+    
+    let message = `Schema mismatch (expected v${SCHEMA_VERSION})`
+    if (missing.length > 0) message += ` - missing: ${missing.join(', ')}`
+    if (unexpected.length > 0) message += ` - unexpected: ${unexpected.join(', ')}`
+    
+    return { valid: false, message }
+  } catch (e) {
+    return { valid: true, message: 'New database - schema will be created' }
+  }
+}
+
+async function insertRecord(db: any, record: ContextRecord): Promise<void> {
+  const dbRow: DBRow = {
+    id: record.id,
+    vector: record.vector,
+    [DB_FIELD.projectId]: record.projectId,
+    [DB_FIELD.contextType]: record.contextType,
+    [DB_FIELD.content]: record.content,
+    [DB_FIELD.metadata]: record.metadata,
+    [DB_FIELD.sessionId]: record.sessionId,
+    [DB_FIELD.createdAt]: record.createdAt,
+    [DB_FIELD.expiresAt]: record.expiresAt,
+    [DB_FIELD.salience]: record.salience
+  }
+  
+  try {
+    const table = await db.openTable("llmngn_context")
+    await table.add([dbRow])
     await debugLog("insertRecord: added to existing table", { id: record.id, type: record.contextType })
   } catch (e) {
     await debugLog("insertRecord: openTable failed, trying createTable", { error: String(e) })
@@ -147,20 +217,20 @@ async function insertRecord(db: any, record: ContextRecord): Promise<void> {
       await db.createTable("llmngn_context", [
         {
           id: "init",
-          vector: Array(128).fill(0),
-          projectId: "init",
-          contextType: "init",
-          content: "init",
-          metadata: "{}",
-          sessionId: "init",
-          createdAt: Date.now(),
-          expiresAt: Date.now() + 86400000,
-          salience: 1.0
+          vector: Array(VECTOR_SIZE).fill(0).map(() => Math.random() * 0.01),
+          [DB_FIELD.projectId]: "init",
+          [DB_FIELD.contextType]: "init",
+          [DB_FIELD.content]: "init",
+          [DB_FIELD.metadata]: "{}",
+          [DB_FIELD.sessionId]: "init",
+          [DB_FIELD.createdAt]: Date.now(),
+          [DB_FIELD.expiresAt]: Date.now() + 86400000,
+          [DB_FIELD.salience]: 1.0
         }
       ])
       await debugLog("insertRecord: created new table, now adding record")
       const table2 = await db.openTable("llmngn_context")
-      await table2.add([record])
+      await table2.add([dbRow])
       await debugLog("insertRecord: added to new table", { id: record.id, type: record.contextType })
     } catch (createErr) {
       await debugLog("insertRecord: FAILED", { error: String(createErr) })
@@ -174,7 +244,21 @@ async function queryRecords(db: any, limit: number, projectId: string): Promise<
     const table = await db.openTable("llmngn_context")
     const results = await table.query().limit(limit).toArray()
     await debugLog("queryRecords: got results", { totalResults: results.length })
-    const filtered = results.filter((r: any) => r.projectId === projectId)
+    const filtered = results
+      .filter((r: any) => r.id !== 'init' && r.id !== '__init__')
+      .filter((r: any) => r[DB_FIELD.projectId] === projectId)
+      .map((r: any): ContextRecord => ({
+        id: r.id,
+        vector: r.vector,
+        projectId: r[DB_FIELD.projectId],
+        contextType: r[DB_FIELD.contextType],
+        content: r[DB_FIELD.content],
+        metadata: r[DB_FIELD.metadata],
+        sessionId: r[DB_FIELD.sessionId],
+        createdAt: r[DB_FIELD.createdAt],
+        expiresAt: r[DB_FIELD.expiresAt],
+        salience: r[DB_FIELD.salience]
+      }))
     await debugLog("queryRecords: filtered by projectId", { filteredCount: filtered.length, searchProjectId: projectId })
     return filtered
   } catch (e) {
@@ -186,15 +270,15 @@ async function queryRecords(db: any, limit: number, projectId: string): Promise<
 async function deleteExpired(db: any): Promise<void> {
   try {
     const table = await db.openTable("llmngn_context")
-    const now = new Date().toISOString()
-    await table.delete(`expiresAt < '${now}'`)
+    const now = Date.now()
+    await table.delete(`${DB_FIELD.expiresAt} < ${now}`)
   } catch {}
 }
 
 async function simpleEmbed(text: string): Promise<number[]> {
   const vector: number[] = []
   const words = text.toLowerCase().split(/\s+/).slice(0, 50)
-  for (let i = 0; i < 128; i++) {
+  for (let i = 0; i < VECTOR_SIZE; i++) {
     let sum = 0
     for (const word of words) {
       const charCodes = word.split('').map(c => c.charCodeAt(0))
@@ -263,6 +347,19 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
       return {
         "experimental.chat.system.transform": async (_input: any, output: any) => {
           output.system.push(`[LLMNGN] LanceDB not available - check debug log at .opencode/plugins/llmngn-debug.log`)
+        }
+      }
+    }
+
+    const schemaCheck = await validateSchema(globalDb)
+    await debugLog("Schema validation", schemaCheck)
+    
+    if (!schemaCheck.valid) {
+      await debugLog("Schema MISMATCH - recommend reset", { message: schemaCheck.message })
+      return {
+        "experimental.chat.system.transform": async (_input: any, output: any) => {
+          output.system.push(`[LLMNGN] ${schemaCheck.message}`)
+          output.system.push(`[LLMNGN] Run: rm -rf .lancedb && llmngn init`)
         }
       }
     }

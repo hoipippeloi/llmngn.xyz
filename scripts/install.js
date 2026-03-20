@@ -50,10 +50,14 @@ async function install() {
   console.log('\n✅ LLMNGN installed successfully!')
   console.log('\nNext steps:')
   console.log('1. Start OpenCode in this directory')
-  console.log('2. The plugin will auto-load')
+  console.log('2. The plugin will auto-load and validate schema')
   console.log('\nFor CLI usage, run from this repo:')
   console.log('  npm link')
+  console.log('  llmngn init')
+  console.log('  llmngn schema   # Validate database schema')
   console.log('  llmngn --help')
+  console.log('\nIf you see schema mismatch errors, reset with:')
+  console.log('  rm -rf .lancedb && llmngn init')
 }
 
 install().catch(e => {

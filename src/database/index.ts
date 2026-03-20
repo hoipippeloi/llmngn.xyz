@@ -1,1 +1,1 @@
-export { LanceDBClient } from './client.js'
+export { LanceDBClient, SCHEMA_VERSION, SCHEMA_FIELDS, DB_FIELD_NAMES, toDBRow, fromDBRow } from './client.js'
