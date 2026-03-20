@@ -1,0 +1,37 @@
+{
+  "enabled": true,
+  "embeddingModel": "nomic-embed-text",
+  "embeddingProvider": "local",
+  "lancedbPath": ".lancedb",
+  "maxContextTokens": 4096,
+  "queryLatencyMs": 500,
+  "salienceDecay": 0.95,
+  "retentionDays": 90,
+  "contextTypes": [
+    "file_change",
+    "decision",
+    "debt",
+    "task",
+    "architecture",
+    "command"
+  ],
+  "weights": {
+    "file_change": 0.8,
+    "decision": 1,
+    "debt": 0.9,
+    "task": 0.7,
+    "architecture": 1,
+    "command": 0.5
+  },
+  "filters": {
+    "excludePatterns": [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/build/**",
+      "**/*.min.js",
+      "**/.env*",
+      "**/package-lock.json"
+    ],
+    "sensitiveDataRedaction": true
+  }
+}
