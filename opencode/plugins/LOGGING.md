@@ -17,6 +17,7 @@ The llmngn plugin captures and persists context from agent sessions to LanceDB, 
 | `project_id` | string | Project identifier (directory basename) |
 | `context_type` | string | Type of context record |
 | `content` | string | The actual content/text |
+| `context` | string | Optional reasoning/context from agent |
 | `metadata` | string | JSON metadata specific to context type |
 | `session_id` | string | Session identifier |
 | `created_at` | number | Creation timestamp (ms) |

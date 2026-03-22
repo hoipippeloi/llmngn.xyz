@@ -296,7 +296,7 @@ async function insertRecord(db: any, record: ContextRecord): Promise<void> {
     [DB_FIELD.projectId]: record.projectId,
     [DB_FIELD.contextType]: record.contextType,
     [DB_FIELD.content]: record.content,
-    [DB_FIELD.context]: record.context,
+    [DB_FIELD.context]: record.context ?? "",
     [DB_FIELD.metadata]: record.metadata,
     [DB_FIELD.sessionId]: record.sessionId,
     [DB_FIELD.createdAt]: record.createdAt,
