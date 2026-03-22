@@ -37,7 +37,69 @@ const RETENTION_DAYS: Record<string, number> = {
   debt: 90,
   file_change: 90,
   task: 60,
-  command: 30
+  command: 30,
+  completion: 60
+}
+
+const COMPLETION_PATTERNS: Array<{ pattern: RegExp; action: string }> = [
+  { pattern: /\b(fixed|fixes|fixed\s+the)\b/i, action: 'fixed' },
+  { pattern: /\b(created|creates|added\s+new)\b/i, action: 'created' },
+  { pattern: /\b(implemented|implements|implemented\s+the)\b/i, action: 'implemented' },
+  { pattern: /\b(refactored|refactors|refactored\s+the)\b/i, action: 'refactored' },
+  { pattern: /\b(updated|updates|modified)\b/i, action: 'updated' },
+  { pattern: /\b(resolved|resolves|solved)\b/i, action: 'resolved' },
+]
+
+const TARGET_PATTERNS = [
+  /(?:in|at|the\s+)?file[s]?\s*[:`]?\s*([^\s,;.!\n]+)/gi,
+  /(?:function|method|class|component)\s+`?([a-zA-Z_][a-zA-Z0-9_]*)`?/gi,
+  /(?:the\s+)?([a-zA-Z_][a-zA-Z0-9_/\\]*\.[a-zA-Z]{1,10})/gi,
+]
+
+function detectCompletion(message: string): { action: string; target: string; shorthand: string } | null {
+  if (!message || message.length < 10) return null
+
+  const lowerMsg = message.toLowerCase()
+  if (!lowerMsg.includes('done') && 
+      !lowerMsg.includes('complete') && 
+      !lowerMsg.includes('finished') &&
+      !lowerMsg.includes('fixed') &&
+      !lowerMsg.includes('created') &&
+      !lowerMsg.includes('implemented') &&
+      !lowerMsg.includes('resolved') &&
+      !lowerMsg.includes('updated') &&
+      !lowerMsg.includes('refactored')) {
+    return null
+  }
+
+  let detectedAction: string | null = null
+  for (const { pattern, action } of COMPLETION_PATTERNS) {
+    if (pattern.test(message)) {
+      detectedAction = action
+      break
+    }
+  }
+  
+  if (!detectedAction) return null
+
+  let target = 'unknown'
+  for (const pattern of TARGET_PATTERNS) {
+    pattern.lastIndex = 0
+    const match = pattern.exec(message)
+    if (match?.[1]) {
+      target = match[1].replace(/[`*]/g, '').trim()
+      if (target.length > 2 && target.length < 100) break
+    }
+  }
+
+  const symbols: Record<string, string> = {
+    fixed: '✓', created: '+', implemented: '★', refactored: '↻', updated: '↑', resolved: '✓'
+  }
+  const symbol = symbols[detectedAction] ?? '✓'
+  const shortTarget = target.length > 40 ? target.slice(0, 37) + '...' : target
+  const shorthand = `${symbol} ${detectedAction}: ${shortTarget}`
+
+  return { action: detectedAction, target, shorthand }
 }
 
 const DEFAULT_CONFIG = {
@@ -49,8 +111,8 @@ const DEFAULT_CONFIG = {
   salienceDecay: 0.95,
   retentionDays: 90,
   debug: true,
-  contextTypes: ["file_change", "decision", "debt", "task", "architecture", "command"],
-  weights: { file_change: 0.8, decision: 1, debt: 0.9, task: 0.7, architecture: 1, command: 0.5 },
+  contextTypes: ["file_change", "decision", "debt", "task", "architecture", "command", "completion"],
+  weights: { file_change: 0.8, decision: 1, debt: 0.9, task: 0.7, architecture: 1, command: 0.5, completion: 0.85 },
   filters: {
     excludePatterns: ["**/node_modules/**", "**/dist/**", "**/.git/**", "**/build/**", "**/*.min.js", "**/.env*", "**/package-lock.json"],
     sensitiveDataRedaction: true
@@ -107,6 +169,7 @@ interface SessionData {
   decisions: Array<{ content: string; rationale?: string }>
   tasks: Array<{ content: string; status: string }>
   errors: Array<{ error: string; context?: string }>
+  completions: Array<{ shorthand: string; action: string; target: string; message: string }>
 }
 
 type LLMProviderType = 'openai' | 'anthropic' | 'ollama' | 'local'
@@ -725,7 +788,8 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
     commands: [],
     decisions: [],
     tasks: [],
-    errors: []
+    errors: [],
+    completions: []
   }
 
   return {
@@ -776,6 +840,11 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
             grouped["command"].slice(-5).reverse().forEach(c => output.system.push(`- ${c.content}`))
           }
 
+          if (grouped["completion"]?.length) {
+            output.system.push(`## Recent Completions (${grouped["completion"].length})`)
+            grouped["completion"].slice(-10).reverse().forEach(c => output.system.push(`- ${c.content}`))
+          }
+
           output.system.push(`---`)
         }
       } catch (error) {
@@ -797,7 +866,8 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
         commands: sessionData.commands.length,
         decisions: sessionData.decisions.length,
         tasks: sessionData.tasks.length,
-        errors: sessionData.errors.length
+        errors: sessionData.errors.length,
+        completions: sessionData.completions.length
       })
       
       if (!globalDb || !globalProjectId || !globalSessionId) return
@@ -837,7 +907,37 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
           }
         }
 
+        if (sessionData.completions.length > 0) {
+          const uniqueTargets = [...new Set(sessionData.completions.map(c => c.target))].slice(0, 5)
+          const actions = sessionData.completions.map(c => c.action)
+          const actionCounts: Record<string, number> = {}
+          for (const a of actions) actionCounts[a] = (actionCounts[a] || 0) + 1
+          const actionSummary = Object.entries(actionCounts).map(([a, n]) => n > 1 ? `${n}x ${a}` : a).join(', ')
+          
+          const relatedFiles = sessionData.filesEdited.filter(f => 
+            sessionData.completions.some(c => c.target && f.filePath.includes(c.target))
+          ).map(f => f.filePath)
+          const uniqueFiles = [...new Set([...relatedFiles, ...sessionData.completions.filter(c=>c.target!=='unknown').map(c=>c.target!)])].slice(0, 5)
+          
+          const completionSummary = `session: ${actionSummary} → ${uniqueTargets.join(', ')}`
+          const chatContext = sessionData.completions.map(c => c.message).filter(Boolean).join(' | ').slice(0, 500)
+          
+          await persistContext(globalDb, completionSummary, "completion", globalSessionId, globalProjectId, { 
+            count: sessionData.completions.length,
+            actions: actionCounts,
+            targets: uniqueTargets,
+            files: uniqueFiles,
+            context: chatContext
+          }, 0.9)
+        }
+
         await deleteExpired(globalDb)
+        sessionData.completions = []
+        sessionData.filesEdited = []
+        sessionData.commands = []
+        sessionData.decisions = []
+        sessionData.tasks = []
+        sessionData.errors = []
         await debugLog("session.idle: complete")
       } catch (error) {
         await debugLog("session.idle ERROR", { error: String(error) })
@@ -928,6 +1028,18 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
       
       if (!globalDb || !globalProjectId || !globalSessionId || !client) return
       if (message?.role !== "assistant" || !message?.content) return
+
+      const completion = detectCompletion(message.content)
+      if (completion) {
+        await debugLog("message.updated: detected completion", completion)
+        sessionData.completions.push({ ...completion, message: message.content })
+        await persistContext(
+          globalDb, completion.shorthand, "completion",
+          globalSessionId, globalProjectId,
+          { action: completion.action, target: completion.target },
+          0.85
+        )
+      }
 
       if (globalConfig?.llm.enabled) {
         const extraction = await extractWithLLM(message.content, 'message')
@@ -1056,7 +1168,8 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
             commands: sessionData.commands.length,
             decisions: sessionData.decisions.length,
             tasks: sessionData.tasks.length,
-            errors: sessionData.errors.length
+            errors: sessionData.errors.length,
+            completions: sessionData.completions.length
           })
 
           if (!globalDb || !globalProjectId || !globalSessionId) return
@@ -1096,7 +1209,32 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
               }
             }
 
+            if (sessionData.completions.length > 0) {
+              const uniqueTargets = [...new Set(sessionData.completions.map(c => c.target))].slice(0, 5)
+              const actions = sessionData.completions.map(c => c.action)
+              const actionCounts: Record<string, number> = {}
+              for (const a of actions) actionCounts[a] = (actionCounts[a] || 0) + 1
+              const actionSummary = Object.entries(actionCounts).map(([a, n]) => n > 1 ? `${n}x ${a}` : a).join(', ')
+              
+              const relatedFiles = sessionData.filesEdited.filter(f => 
+                sessionData.completions.some(c => c.target && f.filePath.includes(c.target))
+              ).map(f => f.filePath)
+              const uniqueFiles = [...new Set([...relatedFiles, ...sessionData.completions.filter(c=>c.target!=='unknown').map(c=>c.target!)])].slice(0, 5)
+              
+              const completionSummary = `session: ${actionSummary} → ${uniqueTargets.join(', ')}`
+              const chatContext = sessionData.completions.map(c => c.message).filter(Boolean).join(' | ').slice(0, 500)
+              
+              await persistContext(globalDb, completionSummary, "completion", globalSessionId, globalProjectId, { 
+                count: sessionData.completions.length,
+                actions: actionCounts,
+                targets: uniqueTargets,
+                files: uniqueFiles,
+                context: chatContext
+              }, 0.9)
+            }
+
             await deleteExpired(globalDb)
+            sessionData.completions = []
             sessionData.filesEdited = []
             sessionData.commands = []
             sessionData.decisions = []
@@ -1142,11 +1280,26 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
 
           if (!globalDb || !globalProjectId) return
 
-          if (role === "assistant" && content && globalConfig?.llm?.enabled) {
+          if (role === "assistant" && content) {
             const effectiveSessionId = globalSessionId || `session-${Date.now()}`
-            const extraction = await extractWithLLM(content, 'message')
-            if (extraction) {
-              await storeExtractedContext(globalDb, extraction, effectiveSessionId, globalProjectId)
+            
+            const completion = detectCompletion(content)
+            if (completion) {
+              await debugLog("event:message.updated: detected completion", completion)
+              sessionData.completions.push({ ...completion, message: content })
+              await persistContext(
+                globalDb, completion.shorthand, "completion",
+                effectiveSessionId, globalProjectId,
+                { action: completion.action, target: completion.target },
+                0.85
+              )
+            }
+
+            if (globalConfig?.llm?.enabled) {
+              const extraction = await extractWithLLM(content, 'message')
+              if (extraction) {
+                await storeExtractedContext(globalDb, extraction, effectiveSessionId, globalProjectId)
+              }
             }
           }
           break

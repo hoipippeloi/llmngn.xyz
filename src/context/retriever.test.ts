@@ -37,14 +37,15 @@ describe('ContextRetriever', () => {
       queryLatencyMs: 500,
       salienceDecay: 0.95,
       retentionDays: 90,
-      contextTypes: ['file_change', 'decision', 'debt', 'task', 'architecture', 'command'],
+      contextTypes: ['file_change', 'decision', 'debt', 'task', 'architecture', 'command', 'completion'],
       weights: {
         file_change: 0.8,
         decision: 1.0,
         debt: 0.9,
         task: 0.7,
         architecture: 1.0,
-        command: 0.5
+        command: 0.5,
+        completion: 0.85
       },
       filters: {
         excludePatterns: [],

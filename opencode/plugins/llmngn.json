@@ -13,7 +13,8 @@
     "debt",
     "task",
     "architecture",
-    "command"
+    "command",
+    "completion"
   ],
   "weights": {
     "file_change": 0.8,
@@ -21,7 +22,8 @@
     "debt": 0.9,
     "task": 0.7,
     "architecture": 1,
-    "command": 0.5
+    "command": 0.5,
+    "completion": 0.85
   },
   "filters": {
     "excludePatterns": [

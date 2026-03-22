@@ -7,7 +7,8 @@ import type {
   ContextRecord,
   FileChangeMetadata,
   DecisionMetadata,
-  ContextType
+  ContextType,
+  CompletionMetadata
 } from '../types/index.js'
 import { SemanticExtractor, extractionResultToContextRecords } from './extractor.js'
 
@@ -314,6 +315,32 @@ export class ContextPersister {
     await this.db.insert(record)
   }
 
+  async persistCompletion(
+    metadata: CompletionMetadata,
+    sessionId: string,
+    projectId: string
+  ): Promise<void> {
+    const content = `${metadata.action}: ${metadata.target}`
+    const embedding = await this.embedder.encode(content)
+    const expiresAt = this.calculateExpiry('completion')
+    const id = this.generateId(content, 'completion')
+
+    const record: ContextRecord = {
+      id,
+      vector: embedding.vector,
+      projectId,
+      contextType: 'completion',
+      content,
+      metadata,
+      sessionId,
+      createdAt: new Date().toISOString(),
+      expiresAt,
+      salience: 0.85
+    }
+
+    await this.db.insert(record)
+  }
+
   redactSensitiveData(content: string): string {
     if (!this.config.filters.sensitiveDataRedaction) {
       return content
@@ -359,7 +386,8 @@ export class ContextPersister {
       debt: defaultRetention,
       file_change: 90,
       task: 60,
-      command: 30
+      command: 30,
+      completion: 60
     }
     return retentionMap[contextType] ?? defaultRetention
   }

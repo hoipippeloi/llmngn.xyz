@@ -5,6 +5,7 @@ export type ContextType =
   | 'task'
   | 'architecture'
   | 'command'
+  | 'completion'
 
 export type ChangeType = 'create' | 'modify' | 'delete'
 
@@ -72,6 +73,12 @@ export interface InitMetadata {
   initializedAt: string
 }
 
+export interface CompletionMetadata {
+  action: 'fixed' | 'created' | 'implemented' | 'refactored' | 'updated' | 'resolved'
+  target: string
+  details?: string
+}
+
 export type ContextMetadata =
   | FileChangeMetadata
   | DecisionMetadata
@@ -80,6 +87,7 @@ export type ContextMetadata =
   | ArchitectureMetadata
   | CommandMetadata
   | InitMetadata
+  | CompletionMetadata
   | Record<string, unknown>
 
 export interface ContextRecord {

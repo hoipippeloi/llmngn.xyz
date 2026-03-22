@@ -5,6 +5,7 @@ import { ContextRetriever } from '../context/retriever.js'
 import { ContextPersister } from '../context/persister.js'
 import { SemanticExtractor } from '../context/extractor.js'
 import { ConfigManager } from '../utils/config.js'
+import { detectCompletion } from '../utils/index.js'
 import type { 
   PluginHooks,
   HookInput, 
@@ -211,8 +212,15 @@ export async function ContextPersistencePlugin(
         
         const message = input.message as { type?: string; content?: string; role?: string }
         
-        if (extractor && message.role === 'assistant' && message.content) {
-          await persister.persistFromLLM(message.content, 'decision', currentSessionId, projectId)
+        if (message.role === 'assistant' && message.content) {
+          const completion = detectCompletion(message.content)
+          if (completion) {
+            await persister.persistCompletion(completion, currentSessionId, projectId)
+          }
+          
+          if (extractor) {
+            await persister.persistFromLLM(message.content, 'decision', currentSessionId, projectId)
+          }
         } else if (message?.type === 'decision') {
           await persister.persistDecision({
             decisionType: 'pattern',

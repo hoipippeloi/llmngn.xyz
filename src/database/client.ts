@@ -128,7 +128,7 @@ export class LanceDBClient {
     const id = row['id'] as string
     if (id === '__init__' || id === 'init') return true
     const contextType = row[DB_FIELD_NAMES.contextType] as string
-    const validTypes = ['file_change', 'decision', 'debt', 'task', 'architecture', 'command']
+    const validTypes = ['file_change', 'decision', 'debt', 'task', 'architecture', 'command', 'completion']
     return !validTypes.includes(contextType)
   }
 
