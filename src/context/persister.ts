@@ -9,6 +9,7 @@ import type {
   DecisionMetadata,
   ContextType
 } from '../types/index.js'
+import { SemanticExtractor, extractionResultToContextRecords } from './extractor.js'
 
 const REDACTION_PATTERNS = [
   /API_KEY=\S+/gi,
@@ -26,38 +27,145 @@ export class ContextPersister {
   private embedder: EmbeddingProvider
   private config: PluginConfig
   private recentHashes: Set<string> = new Set()
+  private extractor?: SemanticExtractor
 
-  constructor(db: LanceDBClient, embedder: EmbeddingProvider, config: PluginConfig) {
+  constructor(db: LanceDBClient, embedder: EmbeddingProvider, config: PluginConfig, extractor?: SemanticExtractor) {
     this.db = db
     this.embedder = embedder
     this.config = config
+    this.extractor = extractor
+  }
+
+  setExtractor(extractor: SemanticExtractor): void {
+    this.extractor = extractor
   }
 
   async persistSession(summary: SessionSummary, projectId: string): Promise<void> {
     const tasks: Promise<void>[] = []
 
-    for (const change of summary.changes) {
-      if (this.shouldExclude(change.filePath)) continue
-      tasks.push(this.persistFileChange(change, summary.sessionId, projectId))
-    }
+    if (this.extractor) {
+      const sessionText = this.sessionToText(summary)
+      const extraction = await this.extractor.summarizeSession(sessionText)
+      const contentHash = this.hashContent(sessionText)
+      
+      const extractedRecords = extractionResultToContextRecords(
+        extraction,
+        summary.sessionId,
+        projectId,
+        contentHash
+      )
+      
+      for (const record of extractedRecords) {
+        tasks.push(this.persistFromExtraction(record, summary.sessionId, projectId))
+      }
+    } else {
+      for (const change of summary.changes) {
+        if (this.shouldExclude(change.filePath)) continue
+        tasks.push(this.persistFileChange(change, summary.sessionId, projectId))
+      }
 
-    for (const decision of summary.decisions) {
-      tasks.push(this.persistDecision(decision, summary.sessionId, projectId))
-    }
+      for (const decision of summary.decisions) {
+        tasks.push(this.persistDecision(decision, summary.sessionId, projectId))
+      }
 
-    for (const task of summary.tasks) {
-      tasks.push(this.persistTask(task, summary.sessionId, projectId))
-    }
+      for (const task of summary.tasks) {
+        tasks.push(this.persistTask(task, summary.sessionId, projectId))
+      }
 
-    for (const cmd of summary.commands) {
-      tasks.push(this.persistCommand(cmd, summary.sessionId, projectId))
-    }
+      for (const cmd of summary.commands) {
+        tasks.push(this.persistCommand(cmd, summary.sessionId, projectId))
+      }
 
-    for (const debt of summary.debt) {
-      tasks.push(this.persistDebt(debt, summary.sessionId, projectId))
+      for (const debt of summary.debt) {
+        tasks.push(this.persistDebt(debt, summary.sessionId, projectId))
+      }
     }
 
     await Promise.all(tasks)
+  }
+
+  private sessionToText(summary: SessionSummary): string {
+    const parts: string[] = []
+    
+    if (summary.changes.length > 0) {
+      parts.push('FILE CHANGES:')
+      for (const c of summary.changes) {
+        parts.push(`- ${c.changeType} ${c.filePath}: ${c.diffSummary}`)
+      }
+    }
+    
+    if (summary.decisions.length > 0) {
+      parts.push('DECISIONS:')
+      for (const d of summary.decisions) {
+        parts.push(`- ${d.decisionType}: ${d.rationale}`)
+      }
+    }
+    
+    if (summary.tasks.length > 0) {
+      parts.push('TASKS:')
+      for (const t of summary.tasks) {
+        parts.push(`- [${t.status}] ${t.taskId}: ${t.blockedReason ?? ''}`)
+      }
+    }
+    
+    if (summary.commands.length > 0) {
+      parts.push('COMMANDS:')
+      for (const c of summary.commands) {
+        parts.push(`- ${c.commandLine} (exit: ${c.exitCode})`)
+      }
+    }
+    
+    if (summary.debt.length > 0) {
+      parts.push('TECHNICAL DEBT:')
+      for (const d of summary.debt) {
+        parts.push(`- ${d.debtType} (${d.severity}): ${d.estimatedEffort}`)
+      }
+    }
+    
+    return parts.join('\n')
+  }
+
+  private async persistFromExtraction(
+    record: { type: ContextType; content: string; metadata: Record<string, unknown>; salience: number },
+    sessionId: string,
+    projectId: string
+  ): Promise<void> {
+    const content = this.redactSensitiveData(record.content)
+    const embedding = await this.embedder.encode(content)
+    const expiresAt = this.calculateExpiry(record.type)
+
+    const dbRecord: ContextRecord = {
+      id: uuidv4(),
+      vector: embedding.vector,
+      projectId,
+      contextType: record.type,
+      content,
+      metadata: record.metadata,
+      sessionId,
+      createdAt: new Date().toISOString(),
+      expiresAt,
+      salience: record.salience
+    }
+
+    await this.db.insert(dbRecord)
+  }
+
+  async persistFromLLM(
+    content: string,
+    contextType: ContextType,
+    sessionId: string,
+    projectId: string,
+    metadata?: Record<string, unknown>
+  ): Promise<void> {
+    if (!this.extractor) return
+
+    const extraction = await this.extractor.extract(content, contextType as any)
+    const contentHash = this.hashContent(content)
+    const records = extractionResultToContextRecords(extraction, sessionId, projectId, contentHash)
+
+    for (const record of records) {
+      await this.persistFromExtraction(record, sessionId, projectId)
+    }
   }
 
   async persistFileChange(

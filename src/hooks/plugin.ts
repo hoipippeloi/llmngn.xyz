@@ -1,7 +1,9 @@
 import { LanceDBClient } from '../database/client.js'
 import { createEmbeddingProvider } from '../embedding/embedding.js'
+import { createLLMProvider } from '../llm/client.js'
 import { ContextRetriever } from '../context/retriever.js'
 import { ContextPersister } from '../context/persister.js'
+import { SemanticExtractor } from '../context/extractor.js'
 import { ConfigManager } from '../utils/config.js'
 import type { 
   PluginHooks,
@@ -39,8 +41,24 @@ export async function ContextPersistencePlugin(
     apiKey: config.apiKey
   })
 
+  let extractor: SemanticExtractor | undefined
+  if (config.llm?.enabled) {
+    try {
+      const llmProvider = createLLMProvider({
+        provider: config.llm.provider,
+        model: config.llm.model,
+        apiKey: config.llm.apiKey,
+        endpoint: config.llm.endpoint
+      })
+      extractor = new SemanticExtractor(llmProvider, config.llm.extractionConfidenceThreshold)
+      console.log('[LLMNGN] LLM extraction enabled with', config.llm.provider)
+    } catch (e) {
+      console.error('[LLMNGN] Failed to initialize LLM provider:', e)
+    }
+  }
+
   const retriever = new ContextRetriever(db, embedder, config)
-  const persister = new ContextPersister(db, embedder, config)
+  const persister = new ContextPersister(db, embedder, config, extractor)
 
   const projectId = createHash('sha256').update(directory).digest('hex').slice(0, 16)
   let currentSessionId: string | null = null
@@ -109,14 +127,24 @@ export async function ContextPersistencePlugin(
           return
         }
 
-        await persister.persistFileChange({
-          filePath: input.filePath,
-          changeType: 'modify',
-          diffSummary: String(input.changes ?? 'File modified'),
-          linesAdded: 0,
-          linesRemoved: 0,
-          relatedTasks: []
-        }, currentSessionId, projectId)
+        if (extractor) {
+          await persister.persistFromLLM(
+            String(input.changes ?? `File modified: ${input.filePath}`),
+            'file_change',
+            currentSessionId,
+            projectId,
+            { filePath: input.filePath }
+          )
+        } else {
+          await persister.persistFileChange({
+            filePath: input.filePath,
+            changeType: 'modify',
+            diffSummary: String(input.changes ?? 'File modified'),
+            linesAdded: 0,
+            linesRemoved: 0,
+            relatedTasks: []
+          }, currentSessionId, projectId)
+        }
       } catch (error) {
         console.error('file.edited hook error:', error)
       }
@@ -145,7 +173,6 @@ export async function ContextPersistencePlugin(
         if (!input.tool || !currentSessionId) {
           return
         }
-        
       } catch (error) {
         console.error('tool.execute.after hook error:', error)
       }
@@ -157,8 +184,11 @@ export async function ContextPersistencePlugin(
           return
         }
         
-        const message = input.message as { type?: string; content?: string }
-        if (message?.type === 'decision') {
+        const message = input.message as { type?: string; content?: string; role?: string }
+        
+        if (extractor && message.role === 'assistant' && message.content) {
+          await persister.persistFromLLM(message.content, 'message', currentSessionId, projectId)
+        } else if (message?.type === 'decision') {
           await persister.persistDecision({
             decisionType: 'pattern',
             rationale: message.content ?? '',
@@ -195,13 +225,26 @@ export async function ContextPersistencePlugin(
           return
         }
 
-        await persister.persistDebt({
-          debtType: 'maintainability',
-          severity: 'medium',
-          introducedIn: currentSessionId ?? 'unknown',
-          estimatedEffort: '1',
-          blockingRelease: false
-        }, currentSessionId ?? 'unknown', projectId)
+        const errorObj = input.error as { message?: string; stack?: string }
+        const errorMessage = errorObj?.message ?? String(input.error)
+
+        if (extractor) {
+          await persister.persistFromLLM(
+            errorMessage,
+            'error',
+            currentSessionId ?? 'unknown',
+            projectId,
+            { stack: errorObj?.stack }
+          )
+        } else {
+          await persister.persistDebt({
+            debtType: 'maintainability',
+            severity: 'medium',
+            introducedIn: currentSessionId ?? 'unknown',
+            estimatedEffort: '1',
+            blockingRelease: false
+          }, currentSessionId ?? 'unknown', projectId)
+        }
       } catch (error) {
         console.error('session.error hook error:', error)
       }

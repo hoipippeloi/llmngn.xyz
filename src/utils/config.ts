@@ -6,6 +6,7 @@ const DEFAULT_CONFIG: PluginConfig = {
   enabled: true,
   embeddingModel: 'nomic-embed-text',
   embeddingProvider: 'local',
+  apiKey: undefined,
   lancedbPath: '.lancedb',
   maxContextTokens: 4096,
   queryLatencyMs: 500,
@@ -30,6 +31,12 @@ const DEFAULT_CONFIG: PluginConfig = {
       '**/package-lock.json'
     ],
     sensitiveDataRedaction: true
+  },
+  llm: {
+    enabled: false,
+    provider: 'openai',
+    model: 'gpt-4o-mini',
+    extractionConfidenceThreshold: 0.7
   }
 }
 
@@ -101,6 +108,22 @@ export class ConfigManager {
       }
     }
 
+    if ('llm' in c && typeof c.llm === 'object' && c.llm !== null) {
+      const llm = c.llm as Record<string, unknown>
+      if ('provider' in llm && !['openai', 'anthropic', 'ollama', 'local'].includes(llm.provider as string)) {
+        errors.push('llm.provider must be openai, anthropic, ollama, or local')
+      }
+      if ('model' in llm && typeof llm.model !== 'string') {
+        errors.push('llm.model must be a string')
+      }
+      if ('extractionConfidenceThreshold' in llm) {
+        const threshold = llm.extractionConfidenceThreshold
+        if (typeof threshold !== 'number' || threshold < 0 || threshold > 1) {
+          errors.push('llm.extractionConfidenceThreshold must be between 0 and 1')
+        }
+      }
+    }
+
     return {
       valid: errors.length === 0,
       errors
@@ -122,6 +145,10 @@ export class ConfigManager {
       filters: {
         ...DEFAULT_CONFIG.filters,
         ...(userConfig.filters ?? {})
+      },
+      llm: {
+        ...DEFAULT_CONFIG.llm,
+        ...(userConfig.llm ?? {})
       }
     }
   }

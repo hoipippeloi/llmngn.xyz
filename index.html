@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>LLMNGN — Context Persistence for OpenCode</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Oxanium:wght@600;700&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="styles.css" />
+    </head>
+    <body>
+        <div class="noise-overlay"></div>
+        <div class="scanlines"></div>
+
+        <nav class="terminal-nav">
+            <div class="nav-content">
+                <a href="#" class="nav-prompt">
+                    <span class="prompt-symbol">›</span>
+                    <span class="prompt-text">llmngn</span>
+                    <span class="prompt-cursor">_</span>
+                </a>
+                <div class="nav-links">
+                    <a href="#features">features</a>
+                    <a href="#install">install</a>
+                    <a href="#faq">faq</a>
+                    <a
+                        href="https://github.com/hoipippeloi/llmngn.xyz"
+                        class="nav-github"
+                        target="_blank"
+                    >
+                        <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                        >
+                            <path
+                                d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
+                            />
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <main>
+            <section class="hero">
+                <div class="hero-content">
+                    <div class="hero-label">
+                        <span class="label-bracket">[</span>
+                        <span class="label-text">context-persistence</span>
+                        <span class="label-bracket">]</span>
+                    </div>
+                    <h1 class="hero-title">
+                        <span class="title-llm">LLM</span
+                        ><span class="title-ngn">NGN</span>
+                    </h1>
+                    <p class="hero-subtitle">
+                        Remember everything.<br />
+                        <span class="subtitle-accent">Forget nothing.</span>
+                    </p>
+                    <p class="hero-description">
+                        A context persistence plugin for OpenCode that remembers
+                        your coding decisions, changes, and patterns across
+                        sessions. No more starting from scratch.
+                    </p>
+                    <div class="hero-cta">
+                        <a href="#install" class="btn btn-primary">
+                            <span class="btn-text">npm install</span>
+                            <span class="btn-icon">→</span>
+                        </a>
+                        <a href="#features" class="btn btn-secondary">
+                            <span class="btn-text">learn more</span>
+                        </a>
+                    </div>
+                </div>
+                <div class="hero-terminal">
+                    <div class="terminal-header">
+                        <div class="terminal-dots">
+                            <span></span><span></span><span></span>
+                        </div>
+                        <span class="terminal-title">~/projects/my-app</span>
+                    </div>
+                    <div class="terminal-body">
+                        <div class="terminal-line">
+                            <span class="terminal-prompt">$</span>
+                            <span class="terminal-command"
+                                >llmngn add "Use Redis for caching"</span
+                            >
+                            <span class="terminal-type">--type decision</span>
+                        </div>
+                        <div class="terminal-line terminal-response">
+                            <span class="response-arrow">✓</span>
+                            <span>Decision stored: Use Redis for caching</span>
+                        </div>
+                        <div class="terminal-line">
+                            <span class="terminal-prompt">$</span>
+                            <span class="terminal-command"
+                                >llmngn query "caching"</span
+                            >
+                        </div>
+                        <div class="terminal-line terminal-response">
+                            <span
+                                >Found: Use Redis for caching
+                                <span class="context-type"
+                                    >[decision]</span
+                                ></span
+                            >
+                        </div>
+                        <div class="terminal-line terminal-active">
+                            <span class="terminal-prompt">$</span>
+                            <span class="terminal-cursor-block"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="hero-decoration">
+                    <div class="deco-ring deco-ring-1"></div>
+                    <div class="deco-ring deco-ring-2"></div>
+                    <div class="deco-ring deco-ring-3"></div>
+                </div>
+            </section>
+
+            <section class="features" id="features">
+                <div class="section-header">
+                    <span class="section-label">// capabilities</span>
+                    <h2 class="section-title">
+                        Built for<br />persistent context
+                    </h2>
+                </div>
+                <div class="features-grid">
+                    <article class="feature-card feature-1">
+                        <div class="feature-icon">
+                            <svg
+                                width="32"
+                                height="32"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                            >
+                                <circle cx="11" cy="11" r="8" />
+                                <path d="m21 21-4.35-4.35" />
+                            </svg>
+                        </div>
+                        <h3 class="feature-title">Semantic Search</h3>
+                        <p class="feature-desc">
+                            Find conceptually related context, not just
+                            keywords. "Database" matches "PostgreSQL", "SQL",
+                            "data storage" automatically.
+                        </p>
+                        <div class="feature-tag">vector-embeddings</div>
+                    </article>
+                    <article class="feature-card feature-2">
+                        <div class="feature-icon">
+                            <svg
+                                width="32"
+                                height="32"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                            >
+                                <rect
+                                    x="3"
+                                    y="3"
+                                    width="18"
+                                    height="18"
+                                    rx="2"
+                                />
+                                <path d="M3 9h18" />
+                                <path d="M9 21V9" />
+                            </svg>
+                        </div>
+                        <h3 class="feature-title">Typed Context</h3>
+                        <p class="feature-desc">
+                            Categorize with types: decisions, architecture,
+                            debt, tasks, commands. Each with smart retention
+                            policies.
+                        </p>
+                        <div class="feature-tag">structured-storage</div>
+                    </article>
+                    <article class="feature-card feature-3">
+                        <div class="feature-icon">
+                            <svg
+                                width="32"
+                                height="32"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                            >
+                                <path
+                                    d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"
+                                />
+                            </svg>
+                        </div>
+                        <h3 class="feature-title">Local & Secure</h3>
+                        <p class="feature-desc">
+                            All data stays on your machine. Auto-redacts API
+                            keys, passwords, and secrets before storage.
+                        </p>
+                        <div class="feature-tag">zero-cloud</div>
+                    </article>
+                    <article class="feature-card feature-4">
+                        <div class="feature-icon">
+                            <svg
+                                width="32"
+                                height="32"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                            >
+                                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                            </svg>
+                        </div>
+                        <h3 class="feature-title">Zero Config</h3>
+                        <p class="feature-desc">
+                            Works out of the box. Sensible defaults, no setup
+                            needed. Customize only when you want to.
+                        </p>
+                        <div class="feature-tag">batteries-included</div>
+                    </article>
+                </div>
+            </section>
+
+            <section class="context-types">
+                <div class="types-container">
+                    <h2 class="types-title">Context Types</h2>
+                    <div class="types-grid">
+                        <div class="type-item">
+                            <span class="type-name">decision</span>
+                            <span class="type-retention">180 days</span>
+                            <span class="type-desc"
+                                >Important architectural choices</span
+                            >
+                        </div>
+                        <div class="type-item">
+                            <span class="type-name">architecture</span>
+                            <span class="type-retention">365 days</span>
+                            <span class="type-desc"
+                                >System design & structure</span
+                            >
+                        </div>
+                        <div class="type-item">
+                            <span class="type-name">debt</span>
+                            <span class="type-retention">90 days</span>
+                            <span class="type-desc">Technical debt items</span>
+                        </div>
+                        <div class="type-item">
+                            <span class="type-name">file_change</span>
+                            <span class="type-retention">90 days</span>
+                            <span class="type-desc"
+                                >Significant code changes</span
+                            >
+                        </div>
+                        <div class="type-item">
+                            <span class="type-name">task</span>
+                            <span class="type-retention">60 days</span>
+                            <span class="type-desc"
+                                >Todos and action items</span
+                            >
+                        </div>
+                        <div class="type-item">
+                            <span class="type-name">command</span>
+                            <span class="type-retention">30 days</span>
+                            <span class="type-desc"
+                                >Reusable shell commands</span
+                            >
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="install" id="install">
+                <div class="install-grid">
+                    <div class="install-content">
+                        <span class="section-label">// quick-start</span>
+                        <h2 class="section-title">Up in<br />5 minutes</h2>
+                        <p class="install-desc">
+                            One command to rule them all. No configuration, no
+                            setup, no waiting. Just install and start coding.
+                        </p>
+                        <div class="install-steps">
+                            <div class="install-step">
+                                <span class="step-num">01</span>
+                                <div class="step-content">
+                                    <h4>Install the plugin</h4>
+                                    <code class="code-block"
+                                        >npx degit
+                                        hoipippeloi/llmngn.xyz/.opencode
+                                        .opencode</code
+                                    >
+                                </div>
+                            </div>
+                            <div class="install-step">
+                                <span class="step-num">02</span>
+                                <div class="step-content">
+                                    <h4>Install dependencies</h4>
+                                    <code class="code-block"
+                                        >cd .opencode && bun install && cd
+                                        ..</code
+                                    >
+                                </div>
+                            </div>
+                            <div class="install-step">
+                                <span class="step-num">03</span>
+                                <div class="step-content">
+                                    <h4>Start coding</h4>
+                                    <code class="code-block"
+                                        >/llmngn store that we decided to use
+                                        Redis</code
+                                    >
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="install-visual">
+                        <div class="install-terminal">
+                            <div class="terminal-header">
+                                <div class="terminal-dots">
+                                    <span></span><span></span><span></span>
+                                </div>
+                            </div>
+                            <div class="terminal-body">
+                                <div class="t-line">
+                                    <span class="t-comment"
+                                        ># Install in 30 seconds</span
+                                    >
+                                </div>
+                                <div class="t-line">
+                                    <span class="t-prompt">$</span> npx degit
+                                    hoipippeloi/llmngn.xyz/.opencode .opencode
+                                </div>
+                                <div class="t-line t-output">
+                                    Cloning 47 files... ✓
+                                </div>
+                                <div class="t-line">
+                                    <span class="t-prompt">$</span> cd .opencode
+                                    && bun install
+                                </div>
+                                <div class="t-line t-output">
+                                    ✓ Installed 3 packages
+                                </div>
+                                <div class="t-line">
+                                    <span class="t-prompt">$</span> opencode
+                                </div>
+                                <div class="t-line t-output">
+                                    Plugin llmngn loaded ✓
+                                </div>
+                                <div class="t-line">
+                                    <span class="t-comment"># Ready to go</span>
+                                </div>
+                                <div class="t-line t-active">
+                                    <span class="t-prompt">$</span>
+                                    <span class="t-cursor"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="faq" id="faq">
+                <div class="faq-container">
+                    <div class="section-header">
+                        <span class="section-label">// questions</span>
+                        <h2 class="section-title">FAQ</h2>
+                    </div>
+                    <div class="faq-list">
+                        <details class="faq-item">
+                            <summary class="faq-question">
+                                <span>How do I install LLMNGN?</span>
+                                <span class="faq-icon">+</span>
+                            </summary>
+                            <div class="faq-answer">
+                                Run this in your project folder:<br /><br />
+                                <code
+                                    >npx degit hoipippeloi/llmngn.xyz/.opencode
+                                    .opencode && cd .opencode && bun install &&
+                                    cd ..</code
+                                >
+                            </div>
+                        </details>
+                        <details class="faq-item">
+                            <summary class="faq-question">
+                                <span>Do I need to configure anything?</span>
+                                <span class="faq-icon">+</span>
+                            </summary>
+                            <div class="faq-answer">
+                                No! LLMNGN works out of the box with sensible
+                                defaults. You can customize settings in
+                                <code>.opencode/plugins/llmngn.json</code> if
+                                needed.
+                            </div>
+                        </details>
+                        <details class="faq-item">
+                            <summary class="faq-question">
+                                <span>Is my data secure?</span>
+                                <span class="faq-icon">+</span>
+                            </summary>
+                            <div class="faq-answer">
+                                Yes! Data stays on your machine. The plugin also
+                                auto-redacts API keys, passwords, tokens, and
+                                secrets before storage.
+                            </div>
+                        </details>
+                        <details class="faq-item">
+                            <summary class="faq-question">
+                                <span>How does semantic search work?</span>
+                                <span class="faq-icon">+</span>
+                            </summary>
+                            <div class="faq-answer">
+                                LLMNGN uses vector embeddings to find
+                                conceptually related context, not just keyword
+                                matches. "Database" finds "PostgreSQL", "SQL",
+                                "data storage", etc.
+                            </div>
+                        </details>
+                        <details class="faq-item">
+                            <summary class="faq-question">
+                                <span>Can I use LLMNGN offline?</span>
+                                <span class="faq-icon">+</span>
+                            </summary>
+                            <div class="faq-answer">
+                                Yes! Everything runs locally. No internet
+                                required after installation.
+                            </div>
+                        </details>
+                        <details class="faq-item">
+                            <summary class="faq-question">
+                                <span>Is LLMNGN free?</span>
+                                <span class="faq-icon">+</span>
+                            </summary>
+                            <div class="faq-answer">
+                                Yes! LLMNGN is completely free and open source
+                                (MIT license). No premium features, no paid
+                                tiers.
+                            </div>
+                        </details>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="site-footer">
+            <div class="footer-content">
+                <div class="footer-main">
+                    <div class="footer-brand">
+                        <span class="footer-logo">LLMNGN</span>
+                        <p class="footer-tagline">
+                            Context persistence for OpenCode
+                        </p>
+                    </div>
+                    <div class="footer-links">
+                        <div class="footer-col">
+                            <h4>Docs</h4>
+                            <a href="#install">Getting Started</a>
+                            <a href="#faq">FAQ</a>
+                            <a href="#features">Features</a>
+                        </div>
+                        <div class="footer-col">
+                            <h4>Community</h4>
+                            <a
+                                href="https://github.com/hoipippeloi/llmngn.xyz"
+                                target="_blank"
+                                >GitHub</a
+                            >
+                            <a
+                                href="https://github.com/hoipippeloi/llmngn.xyz/issues"
+                                target="_blank"
+                                >Issues</a
+                            >
+                        </div>
+                        <div class="footer-col">
+                            <h4>Support</h4>
+                            <a href="mailto:support@llmngn.xyz">Email</a>
+                            <a
+                                href="https://github.com/hoipippeloi/llmngn.xyz/issues"
+                                target="_blank"
+                                >Report Bug</a
+                            >
+                        </div>
+                    </div>
+                </div>
+                <div class="footer-bottom">
+                    <span class="footer-copy">MIT License © 2024</span>
+                    <span class="footer-status">
+                        <span class="status-dot"></span>
+                        All systems operational
+                    </span>
+                </div>
+            </div>
+        </footer>
+
+        <script src="script.js"></script>
+    </body>
+</html>

@@ -111,6 +111,14 @@ export interface PluginConfig {
     excludePatterns: string[]
     sensitiveDataRedaction: boolean
   }
+  llm?: {
+    enabled: boolean
+    provider: LLMProviderType
+    model: string
+    apiKey?: string
+    endpoint?: string
+    extractionConfidenceThreshold?: number
+  }
 }
 
 export interface QueryOptions {
@@ -164,6 +172,64 @@ export interface HookInput {
   message?: unknown
   todo?: unknown
   error?: unknown
+}
+
+export type LLMProviderType = 'openai' | 'anthropic' | 'ollama' | 'local'
+
+export interface LLMConfig {
+  provider: LLMProviderType
+  apiKey?: string
+  endpoint?: string
+  model: string
+  maxTokens?: number
+  temperature?: number
+}
+
+export interface LLMMessage {
+  role: 'system' | 'user' | 'assistant'
+  content: string
+}
+
+export interface LLMResponse {
+  content: string
+  raw?: unknown
+}
+
+export interface ExtractionResult {
+  decisions: Array<{
+    content: string
+    rationale?: string
+    confidence: number
+  }>
+  architecture: Array<{
+    content: string
+    description?: string
+    confidence: number
+  }>
+  technicalDebt: Array<{
+    issue: string
+    severity: Severity
+    reason: string
+    confidence: number
+  }>
+  tasks: Array<{
+    content: string
+    status: TaskStatus
+    confidence: number
+  }>
+  fileChanges: Array<{
+    summary: string
+    filePath?: string
+    changeType: ChangeType
+    confidence: number
+  }>
+}
+
+export interface LLMProvider {
+  name: string
+  complete(messages: LLMMessage[], options?: { temperature?: number; maxTokens?: number }): Promise<LLMResponse>
+  completeStructured<T>(messages: LLMMessage[], schema: object, options?: { temperature?: number; maxTokens?: number; retries?: number }): Promise<T>
+  isAvailable(): Promise<boolean>
 }
 
 export interface HookOutput {
