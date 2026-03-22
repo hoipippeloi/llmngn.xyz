@@ -1,4 +1,4 @@
-# LLMNGN
+# $ llmngn_
 
 Context persistence plugin for OpenCode - stores and retrieves context across sessions.
 

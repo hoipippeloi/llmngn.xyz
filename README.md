@@ -1,4 +1,4 @@
-# LLMNGN
+# $ llmngn_
 
 Context persistence plugin for OpenCode that maintains semantic continuity across coding sessions using LanceDB.
 
@@ -9,10 +9,7 @@ npx degit hoipippeloi/llmngn.xyz/.opencode .opencode && cd .opencode && bun inst
 ```
 
 ```powershell
-npx degit hoipippeloi/llmngn.xyz/.opencode .opencode
-cd .opencode
-bun install
-cd ..
+npx degit hoipippeloi/llmngn.xyz/.opencode .opencode; cd .opencode; bun install; cd ..
 ```
 
 This installs:

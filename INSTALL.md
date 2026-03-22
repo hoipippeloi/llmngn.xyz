@@ -1,4 +1,4 @@
-# LLMNGN Installation
+# $ llmngn_ Installation
 
 Context persistence plugin for OpenCode that maintains semantic continuity across coding sessions using LanceDB.
 

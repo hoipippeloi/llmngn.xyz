@@ -1,4 +1,4 @@
-# LLMNGN CLI Reference
+# $ llmngn_ CLI Reference
 
 CLI for managing the LLMNGN context database.
 

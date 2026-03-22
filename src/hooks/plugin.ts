@@ -10,6 +10,7 @@ import type {
   SessionSummary 
 } from '../types/index.js'
 import { createHash } from 'crypto'
+import { join } from 'path'
 
 interface PluginOptions {
   client: unknown
@@ -28,7 +29,7 @@ export async function ContextPersistencePlugin(
     return {}
   }
 
-  const dbPath = config.lancedbPath
+  const dbPath = join(directory, config.lancedbPath)
   const db = new LanceDBClient(dbPath)
   await db.initialize()
 
