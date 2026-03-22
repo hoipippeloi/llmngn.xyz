@@ -11,6 +11,7 @@ const DB_FIELD = {
   projectId: 'project_id',
   contextType: 'context_type',
   content: 'content',
+  context: 'context',
   metadata: 'metadata',
   sessionId: 'session_id',
   createdAt: 'created_at',
@@ -133,6 +134,7 @@ interface ContextRecord {
   projectId: string
   contextType: string
   content: string
+  context?: string
   metadata: string
   sessionId: string
   createdAt: number
@@ -146,6 +148,7 @@ interface DBRow {
   [DB_FIELD.projectId]: string
   [DB_FIELD.contextType]: string
   [DB_FIELD.content]: string
+  [DB_FIELD.context]?: string
   [DB_FIELD.metadata]: string
   [DB_FIELD.sessionId]: string
   [DB_FIELD.createdAt]: number
@@ -293,6 +296,7 @@ async function insertRecord(db: any, record: ContextRecord): Promise<void> {
     [DB_FIELD.projectId]: record.projectId,
     [DB_FIELD.contextType]: record.contextType,
     [DB_FIELD.content]: record.content,
+    [DB_FIELD.context]: record.context,
     [DB_FIELD.metadata]: record.metadata,
     [DB_FIELD.sessionId]: record.sessionId,
     [DB_FIELD.createdAt]: record.createdAt,
@@ -314,6 +318,7 @@ async function insertRecord(db: any, record: ContextRecord): Promise<void> {
           [DB_FIELD.projectId]: "init",
           [DB_FIELD.contextType]: "init",
           [DB_FIELD.content]: "init",
+          [DB_FIELD.context]: "",
           [DB_FIELD.metadata]: "{}",
           [DB_FIELD.sessionId]: "init",
           [DB_FIELD.createdAt]: Date.now(),
@@ -343,6 +348,7 @@ async function queryRecords(db: any, limit: number, projectId: string): Promise<
         projectId: r[DB_FIELD.projectId],
         contextType: r[DB_FIELD.contextType],
         content: r[DB_FIELD.content],
+        context: r[DB_FIELD.context],
         metadata: r[DB_FIELD.metadata],
         sessionId: r[DB_FIELD.sessionId],
         createdAt: r[DB_FIELD.createdAt],
@@ -384,7 +390,8 @@ async function persistContext(
   sessionId: string,
   projectId: string,
   metadata: Record<string, unknown> = {},
-  salience?: number
+  salience?: number,
+  context?: string
 ): Promise<void> {
   if (!content || content.trim().length === 0) return
   
@@ -399,6 +406,7 @@ async function persistContext(
     projectId,
     contextType,
     content: redacted,
+    context: context ? redactSensitive(context) : undefined,
     metadata: JSON.stringify(metadata),
     sessionId,
     createdAt: now,
