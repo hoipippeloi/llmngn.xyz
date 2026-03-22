@@ -173,6 +173,31 @@ export async function ContextPersistencePlugin(
         if (!input.tool || !currentSessionId) {
           return
         }
+
+        const toolName = String(input.tool)
+        const filePath = input.filePath as string | undefined
+        const changes = input.changes as string | undefined
+
+        if ((toolName === 'write' || toolName === 'edit') && filePath) {
+          if (extractor) {
+            await persister.persistFromLLM(
+              changes ?? `File ${toolName === 'write' ? 'created' : 'edited'}: ${filePath}`,
+              'file_change',
+              currentSessionId,
+              projectId,
+              { filePath }
+            )
+          } else {
+            await persister.persistFileChange({
+              filePath,
+              changeType: toolName === 'write' ? 'create' : 'modify',
+              diffSummary: changes ?? `File ${toolName === 'write' ? 'created' : 'edited'}`,
+              linesAdded: 0,
+              linesRemoved: 0,
+              relatedTasks: []
+            }, currentSessionId, projectId)
+          }
+        }
       } catch (error) {
         console.error('tool.execute.after hook error:', error)
       }

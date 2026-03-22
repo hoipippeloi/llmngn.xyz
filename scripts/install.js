@@ -11,7 +11,8 @@ const FILES = [
   '.opencode/plugins/llmngn.ts',
   '.opencode/plugins/llmngn.json',
   '.opencode/package.json',
-  '.opencode/commands/llmngn.md'
+  '.opencode/commands/llmngn.md',
+  'LLMNGN.md'
 ]
 
 async function downloadFile(url, dest) {

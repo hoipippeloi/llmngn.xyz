@@ -61,3 +61,35 @@ llmngn uninstall --full
 ## Config
 
 Edit `.opencode/plugins/llmngn.json` to customize retention, weights, filters.
+
+## Context Types
+
+| Type | Weight | Retention |
+|------|--------|-----------|
+| decision | 1.0 | 180 days |
+| architecture | 1.0 | 365 days |
+| debt | 0.9 | 90 days |
+| file_change | 0.8 | 90 days |
+| task | 0.7 | 60 days |
+| command | 0.5 | 30 days |
+
+## Interactive Command
+
+Use `/llmngn` in OpenCode for natural language interaction:
+
+```
+/llmngn store that we decided to use Redis for caching
+/llmngn show me my latest records
+/llmngn find anything about authentication
+/llmngn export my data
+```
+
+## Troubleshooting
+
+```bash
+# Plugin not loading
+cd .opencode && npm install
+
+# Reset everything
+rm -rf .lancedb && llmngn init
+```

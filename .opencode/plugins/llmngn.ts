@@ -956,22 +956,32 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
       const toolName = input?.tool
       await debugLog("tool.execute.after", { tool: toolName })
       
-      if (!globalDb || !globalProjectId || !globalSessionId) return
+      if (!globalDb || !globalProjectId) return
+      
+      const effectiveSessionId = globalSessionId || `session-${Date.now()}`
 
       if (toolName === "bash") {
         const command = output?.args?.command || input?.args?.command
         if (command && !sessionData.commands.some(c => c.command === command)) {
           sessionData.commands.push({ command: String(command), exitCode: 0, duration: 0 })
+          await persistContext(
+            globalDb, String(command), "command",
+            effectiveSessionId, globalProjectId,
+            { tool: "bash" }
+          )
         }
       }
 
       if (toolName === "write" || toolName === "edit") {
         const filePath = output?.args?.filePath || input?.args?.filePath
         if (filePath && !shouldExclude(filePath) && !sessionData.filesEdited.some(f => f.filePath === filePath)) {
-          sessionData.filesEdited.push({
-            filePath,
-            changes: `File ${toolName === 'write' ? 'created' : 'edited'}`
-          })
+          const changes = input?.changes || `File ${toolName === 'write' ? 'created' : 'edited'}`
+          sessionData.filesEdited.push({ filePath, changes })
+          await persistContext(
+            globalDb, changes, "file_change",
+            effectiveSessionId, globalProjectId,
+            { filePath, changeType: toolName === 'write' ? 'create' : 'modify' }
+          )
         }
       }
     },
@@ -1011,6 +1021,217 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
         }
       } catch (error) {
         await debugLog("session.compacting ERROR", { error: String(error) })
+      }
+    },
+
+    "event": async (input: any) => {
+      const eventType = input?.event?.type
+      const props = input?.event?.properties
+
+      if (!eventType) return
+
+      switch (eventType) {
+        case "session.created": {
+          const info = props?.info
+          const sessionId = info?.id
+          await debugLog("event:session.created", { sessionId })
+          if (sessionId) {
+            globalSessionId = sessionId
+            sessionData.sessionId = sessionId
+          }
+          break
+        }
+
+        case "session.idle": {
+          await debugLog("event:session.idle", {
+            sessionId: props?.sessionID,
+            files: sessionData.filesEdited.length,
+            commands: sessionData.commands.length,
+            decisions: sessionData.decisions.length,
+            tasks: sessionData.tasks.length,
+            errors: sessionData.errors.length
+          })
+
+          if (!globalDb || !globalProjectId || !globalSessionId) return
+
+          try {
+            if (globalConfig?.llm?.enabled && (sessionData.decisions.length > 0 || sessionData.tasks.length > 0 || sessionData.errors.length > 0)) {
+              const summary = [
+                ...sessionData.decisions.map(d => `DECISION: ${d.content}${d.rationale ? ` - ${d.rationale}` : ''}`),
+                ...sessionData.tasks.map(t => `TASK: ${t.content} [${t.status}]`),
+                ...sessionData.errors.map(e => `ERROR: ${e.error}${e.context ? ` - ${e.context}` : ''}`)
+              ].join('\n')
+
+              const extraction = await extractWithLLM(summary, 'session_summary')
+              if (extraction) {
+                await storeExtractedContext(globalDb, extraction, globalSessionId, globalProjectId)
+              }
+            } else {
+              for (const f of sessionData.filesEdited) {
+                if (shouldExclude(f.filePath)) continue
+                await persistContext(globalDb, f.changes, "file_change", globalSessionId, globalProjectId, { filePath: f.filePath })
+              }
+
+              for (const cmd of sessionData.commands) {
+                await persistContext(globalDb, cmd.command, "command", globalSessionId, globalProjectId, { exitCode: cmd.exitCode, duration: cmd.duration })
+              }
+
+              for (const d of sessionData.decisions) {
+                await persistContext(globalDb, d.content, "decision", globalSessionId, globalProjectId, { rationale: d.rationale })
+              }
+
+              for (const t of sessionData.tasks) {
+                await persistContext(globalDb, t.content, "task", globalSessionId, globalProjectId, { status: t.status })
+              }
+
+              for (const e of sessionData.errors) {
+                await persistContext(globalDb, e.error, "debt", globalSessionId, globalProjectId, { context: e.context })
+              }
+            }
+
+            await deleteExpired(globalDb)
+            sessionData.filesEdited = []
+            sessionData.commands = []
+            sessionData.decisions = []
+            sessionData.tasks = []
+            sessionData.errors = []
+            await debugLog("event:session.idle: complete")
+          } catch (error) {
+            await debugLog("event:session.idle ERROR", { error: String(error) })
+          }
+          break
+        }
+
+        case "session.error": {
+          const errorMsg = props?.error?.message || props?.error || "Unknown error"
+          await debugLog("event:session.error", { error: errorMsg })
+
+          if (!globalDb || !globalProjectId) return
+
+          sessionData.errors.push({
+            error: String(errorMsg),
+            context: props?.stack
+          })
+
+          const effectiveSessionId = globalSessionId || `session-${Date.now()}`
+
+          if (globalConfig?.llm?.enabled) {
+            const extraction = await extractWithLLM(String(errorMsg), 'error')
+            if (extraction) {
+              await storeExtractedContext(globalDb, extraction, effectiveSessionId, globalProjectId)
+            }
+          } else {
+            await persistContext(globalDb, String(errorMsg), "debt", effectiveSessionId, globalProjectId, { stack: props?.stack }, 0.9)
+          }
+          break
+        }
+
+        case "message.updated": {
+          const info = props?.info
+          const role = info?.role
+          const content = info?.content
+          const messageId = info?.id
+          await debugLog("event:message.updated", { messageId, role, contentLength: content?.length })
+
+          if (!globalDb || !globalProjectId) return
+
+          if (role === "assistant" && content && globalConfig?.llm?.enabled) {
+            const effectiveSessionId = globalSessionId || `session-${Date.now()}`
+            const extraction = await extractWithLLM(content, 'message')
+            if (extraction) {
+              await storeExtractedContext(globalDb, extraction, effectiveSessionId, globalProjectId)
+            }
+          }
+          break
+        }
+
+        case "file.edited": {
+          const filePath = props?.file || props?.filePath
+          await debugLog("event:file.edited", { filePath })
+
+          if (!filePath || !globalDb || !globalProjectId) return
+          if (shouldExclude(filePath)) return
+
+          const effectiveSessionId = globalSessionId || `session-${Date.now()}`
+          const content = props?.changes || `File modified: ${filePath}`
+
+          if (!sessionData.filesEdited.some(f => f.filePath === filePath)) {
+            sessionData.filesEdited.push({ filePath, changes: content })
+          }
+
+          if (globalConfig?.llm?.enabled) {
+            const extraction = await extractWithLLM(content, 'file_diff')
+            if (extraction) {
+              for (const change of extraction.fileChanges ?? []) {
+                if (change.confidence >= (globalConfig.llm.extractionConfidenceThreshold ?? 0.7)) {
+                  await persistContext(
+                    globalDb, change.summary, "file_change",
+                    effectiveSessionId, globalProjectId,
+                    { filePath, changeType: change.changeType },
+                    change.confidence * 0.8
+                  )
+                }
+              }
+            }
+          }
+
+          await persistContext(globalDb, content, "file_change", effectiveSessionId, globalProjectId, { filePath })
+          break
+        }
+
+        case "file.watcher.updated": {
+          const filePath = props?.file
+          if (!filePath || shouldExclude(filePath)) return
+          await debugLog("event:file.watcher.updated", { filePath, event: props?.event })
+          break
+        }
+
+        case "command.executed": {
+          const command = props?.command
+          await debugLog("event:command.executed", { command: command?.substring(0, 50) })
+
+          if (!command || !globalDb || !globalProjectId) return
+
+          const effectiveSessionId = globalSessionId || `session-${Date.now()}`
+
+          if (!sessionData.commands.some(c => c.command === command)) {
+            sessionData.commands.push({ command, exitCode: props?.exitCode ?? 0, duration: props?.duration ?? 0 })
+          }
+
+          await persistContext(globalDb, command, "command", effectiveSessionId, globalProjectId, { exitCode: props?.exitCode, duration: props?.duration })
+          break
+        }
+
+        case "todo.updated": {
+          const todos = props?.todos || []
+          await debugLog("event:todo.updated", { count: todos.length })
+
+          if (!globalDb || !globalProjectId) return
+
+          const effectiveSessionId = globalSessionId || `session-${Date.now()}`
+
+          for (const todo of todos) {
+            if (todo.content) {
+              if (!sessionData.tasks.some(t => t.content === todo.content)) {
+                sessionData.tasks.push({
+                  content: todo.content,
+                  status: todo.status || 'pending'
+                })
+              }
+
+              await persistContext(
+                globalDb, todo.content, "task",
+                effectiveSessionId, globalProjectId,
+                { status: todo.status, priority: todo.priority }
+              )
+            }
+          }
+          break
+        }
+
+        default:
+          await debugLog(`event:${eventType}`, { hasProperties: !!props })
+          break
       }
     }
   }
