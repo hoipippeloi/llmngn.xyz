@@ -231,6 +231,13 @@ export interface ExtractionResult {
     changeType: ChangeType
     confidence: number
   }>
+  completions: Array<{
+    summary: string
+    action: string
+    target: string
+    details?: string
+    confidence: number
+  }>
 }
 
 export interface LLMProvider {

@@ -6,7 +6,7 @@ import type {
   Severity
 } from '../types/index.js'
 
-export type ExtractionContext = 'message' | 'error' | 'command_result' | 'file_diff' | 'session_summary'
+export type ExtractionContext = 'message' | 'error' | 'command_result' | 'file_diff' | 'session_summary' | 'completion'
 
 const EXTRACTION_SCHEMA = {
   type: 'object',
@@ -16,20 +16,20 @@ const EXTRACTION_SCHEMA = {
       items: {
         type: 'object',
         properties: {
-          content: { type: 'string', description: 'The decision text - what was decided' },
-          rationale: { type: 'string', description: 'Why this decision was made' },
+          content: { type: 'string' },
+          rationale: { type: 'string' },
           confidence: { type: 'number', minimum: 0, maximum: 1 }
         },
         required: ['content', 'confidence']
       }
     },
     architecture: {
-      type: 'array', 
+      type: 'array',
       items: {
         type: 'object',
         properties: {
-          content: { type: 'string', description: 'Architecture description - system design, component relationships' },
-          description: { type: 'string', description: 'Additional technical details' },
+          content: { type: 'string' },
+          description: { type: 'string' },
           confidence: { type: 'number', minimum: 0, maximum: 1 }
         },
         required: ['content', 'confidence']
@@ -40,9 +40,9 @@ const EXTRACTION_SCHEMA = {
       items: {
         type: 'object',
         properties: {
-          issue: { type: 'string', description: 'What the debt issue is' },
+          issue: { type: 'string' },
           severity: { type: 'string', enum: ['low', 'medium', 'high', 'critical'] },
-          reason: { type: 'string', description: 'Why this is problematic' },
+          reason: { type: 'string' },
           confidence: { type: 'number', minimum: 0, maximum: 1 }
         },
         required: ['issue', 'severity', 'reason', 'confidence']
@@ -53,7 +53,7 @@ const EXTRACTION_SCHEMA = {
       items: {
         type: 'object',
         properties: {
-          content: { type: 'string', description: 'Task description - what needs to be done' },
+          content: { type: 'string' },
           status: { type: 'string', enum: ['pending', 'in_progress', 'completed', 'blocked'] },
           confidence: { type: 'number', minimum: 0, maximum: 1 }
         },
@@ -65,12 +65,26 @@ const EXTRACTION_SCHEMA = {
       items: {
         type: 'object',
         properties: {
-          summary: { type: 'string', description: 'Summary of what changed' },
-          filePath: { type: 'string', description: 'File path if mentioned' },
+          summary: { type: 'string' },
+          filePath: { type: 'string' },
           changeType: { type: 'string', enum: ['create', 'modify', 'delete'] },
           confidence: { type: 'number', minimum: 0, maximum: 1 }
         },
         required: ['summary', 'changeType', 'confidence']
+      }
+    },
+    completions: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          summary: { type: 'string' },
+          action: { type: 'string' },
+          target: { type: 'string' },
+          details: { type: 'string' },
+          confidence: { type: 'number', minimum: 0, maximum: 1 }
+        },
+        required: ['summary', 'action', 'target', 'confidence']
       }
     }
   }
@@ -145,7 +159,26 @@ Analyze this session summary and extract for long-term memory:
 5. FILE CHANGES - Summary of files modified
 
 This context will be stored in a vector database and used to provide context in future sessions.
-Focus on information that would be valuable to know in future coding sessions.`
+Focus on information that would be valuable to know in future coding sessions.`,
+
+  completion: `You are a completion detector for an AI coding assistant session.
+
+Analyze the assistant's message and detect if it describes completed work. A completion is any done, finished, or accomplished work such as:
+- Bug fixes
+- File creations or modifications
+- Feature implementations
+- Refactoring
+- Documentation updates
+- Task resolutions
+
+For each completion detected, provide:
+1. summary: Brief summary of what was completed (1-2 sentences)
+2. action: The action type (fixed, created, implemented, refactored, updated, resolved)
+3. target: What was targeted (file, feature, bug, etc.)
+4. details: Any additional context
+5. confidence: How confident you are this is a completion (0-1)
+
+Only report completions with confidence >= 0.7. Return empty array if no completions detected.`
 }
 
 export class SemanticExtractor {
@@ -227,7 +260,8 @@ export class SemanticExtractor {
       architecture: result.architecture.filter(a => a.confidence >= threshold),
       technicalDebt: result.technicalDebt.filter(t => t.confidence >= threshold),
       tasks: result.tasks.filter(t => t.confidence >= threshold),
-      fileChanges: result.fileChanges.filter(f => f.confidence >= threshold)
+      fileChanges: result.fileChanges.filter(f => f.confidence >= threshold),
+      completions: result.completions.filter(c => c.confidence >= threshold)
     }
   }
 
@@ -237,7 +271,8 @@ export class SemanticExtractor {
       architecture: [],
       technicalDebt: [],
       tasks: [],
-      fileChanges: []
+      fileChanges: [],
+      completions: []
     }
   }
 }
@@ -302,6 +337,21 @@ export function extractionResultToContextRecords(
         sourceHash: contentHash 
       },
       salience: change.confidence * 0.8
+    })
+  }
+
+  for (const completion of result.completions) {
+    records.push({
+      type: 'completion',
+      content: completion.summary,
+      metadata: { 
+        action: completion.action,
+        target: completion.target,
+        details: completion.details,
+        confidence: completion.confidence,
+        sourceHash: contentHash 
+      },
+      salience: completion.confidence * 0.85
     })
   }
 

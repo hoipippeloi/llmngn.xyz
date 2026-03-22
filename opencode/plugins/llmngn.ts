@@ -159,6 +159,7 @@ interface ExtractionResult {
   technicalDebt: Array<{ issue: string; severity: 'low' | 'medium' | 'high' | 'critical'; reason: string; confidence: number }>
   tasks: Array<{ content: string; status: 'pending' | 'in_progress' | 'completed' | 'blocked'; confidence: number }>
   fileChanges: Array<{ summary: string; filePath?: string; changeType: 'create' | 'modify' | 'delete'; confidence: number }>
+  completions: Array<{ summary: string; action: string; target: string; details?: string; confidence: number }>
 }
 
 interface SessionData {
@@ -513,7 +514,7 @@ Rules:
   throw new Error('Unreachable')
 }
 
-type ExtractionContext = 'message' | 'error' | 'command_result' | 'file_diff' | 'session_summary'
+type ExtractionContext = 'message' | 'error' | 'command_result' | 'file_diff' | 'session_summary' | 'completion'
 
 const EXTRACTION_PROMPTS: Record<ExtractionContext, string> = {
   message: `You are a context extraction specialist for an AI coding assistant session.
@@ -562,7 +563,26 @@ Extract for long-term memory:
 4. TASKS - Work completed and remaining
 5. FILE CHANGES - Summary of files modified
 
-Focus on information valuable for future sessions.`
+Focus on information valuable for future sessions.`,
+
+  completion: `You are a completion detector for an AI coding assistant session.
+
+Analyze the assistant's message and detect if it describes completed work. A completion is any done, finished, or accomplished work such as:
+- Bug fixes
+- File creations or modifications
+- Feature implementations
+- Refactoring
+- Documentation updates
+- Task resolutions
+
+For each completion detected, provide:
+1. summary: Brief summary of what was completed (1-2 sentences)
+2. action: The action type (fixed, created, implemented, refactored, updated, resolved)
+3. target: What was targeted (file, feature, bug, etc.)
+4. details: Any additional context
+5. confidence: How confident you are this is a completion (0-1)
+
+Only report completions with confidence >= 0.7. Return empty array if no completions detected.`
 }
 
 const EXTRACTION_SCHEMA = {
@@ -628,6 +648,20 @@ const EXTRACTION_SCHEMA = {
           confidence: { type: 'number', minimum: 0, maximum: 1 }
         },
         required: ['summary', 'changeType', 'confidence']
+      }
+    },
+    completions: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          summary: { type: 'string' },
+          action: { type: 'string' },
+          target: { type: 'string' },
+          details: { type: 'string' },
+          confidence: { type: 'number', minimum: 0, maximum: 1 }
+        },
+        required: ['summary', 'action', 'target', 'confidence']
       }
     }
   }
@@ -722,6 +756,17 @@ async function storeExtractedContext(
         sessionId, projectId,
         { filePath: change.filePath, changeType: change.changeType, confidence: change.confidence },
         change.confidence * 0.8
+      )
+    }
+  }
+
+  for (const completion of extraction.completions ?? []) {
+    if (completion.confidence >= threshold) {
+      await persistContext(
+        db, completion.summary, "completion",
+        sessionId, projectId,
+        { action: completion.action, target: completion.target, details: completion.details, confidence: completion.confidence },
+        completion.confidence * 0.85
       )
     }
   }
@@ -1029,16 +1074,23 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
       if (!globalDb || !globalProjectId || !globalSessionId || !client) return
       if (message?.role !== "assistant" || !message?.content) return
 
-      const completion = detectCompletion(message.content)
-      if (completion) {
-        await debugLog("message.updated: detected completion", completion)
-        sessionData.completions.push({ ...completion, message: message.content })
-        await persistContext(
-          globalDb, completion.shorthand, "completion",
-          globalSessionId, globalProjectId,
-          { action: completion.action, target: completion.target },
-          0.85
-        )
+      if (globalConfig?.llm.enabled) {
+        const extraction = await extractWithLLM(message.content, 'completion')
+        if (extraction) {
+          await storeExtractedContext(globalDb, extraction, globalSessionId, globalProjectId)
+        }
+      } else {
+        const completion = detectCompletion(message.content)
+        if (completion) {
+          await debugLog("message.updated: detected completion", completion)
+          sessionData.completions.push({ ...completion, message: message.content })
+          await persistContext(
+            globalDb, completion.shorthand, "completion",
+            globalSessionId, globalProjectId,
+            { action: completion.action, target: completion.target },
+            0.85
+          )
+        }
       }
 
       if (globalConfig?.llm.enabled) {
@@ -1282,17 +1334,24 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
 
           if (role === "assistant" && content) {
             const effectiveSessionId = globalSessionId || `session-${Date.now()}`
-            
-            const completion = detectCompletion(content)
-            if (completion) {
-              await debugLog("event:message.updated: detected completion", completion)
-              sessionData.completions.push({ ...completion, message: content })
-              await persistContext(
-                globalDb, completion.shorthand, "completion",
-                effectiveSessionId, globalProjectId,
-                { action: completion.action, target: completion.target },
-                0.85
-              )
+
+            if (globalConfig?.llm?.enabled) {
+              const extraction = await extractWithLLM(content, 'completion')
+              if (extraction) {
+                await storeExtractedContext(globalDb, extraction, effectiveSessionId, globalProjectId)
+              }
+            } else {
+              const completion = detectCompletion(content)
+              if (completion) {
+                await debugLog("event:message.updated: detected completion", completion)
+                sessionData.completions.push({ ...completion, message: content })
+                await persistContext(
+                  globalDb, completion.shorthand, "completion",
+                  effectiveSessionId, globalProjectId,
+                  { action: completion.action, target: completion.target },
+                  0.85
+                )
+              }
             }
 
             if (globalConfig?.llm?.enabled) {
