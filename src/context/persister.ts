@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid'
+import { createHash } from 'crypto'
 import type { LanceDBClient } from '../database/client.js'
 import type { 
   EmbeddingProvider, 
@@ -26,7 +26,6 @@ export class ContextPersister {
   private db: LanceDBClient
   private embedder: EmbeddingProvider
   private config: PluginConfig
-  private recentHashes: Set<string> = new Set()
   private extractor?: SemanticExtractor
 
   constructor(db: LanceDBClient, embedder: EmbeddingProvider, config: PluginConfig, extractor?: SemanticExtractor) {
@@ -38,6 +37,12 @@ export class ContextPersister {
 
   setExtractor(extractor: SemanticExtractor): void {
     this.extractor = extractor
+  }
+
+  private generateId(content: string, contextType: ContextType): string {
+    const hash = createHash('sha256')
+    hash.update(content + contextType + Date.now().toString())
+    return hash.digest('hex').slice(0, 24)
   }
 
   async persistSession(summary: SessionSummary, projectId: string): Promise<void> {
@@ -133,9 +138,10 @@ export class ContextPersister {
     const content = this.redactSensitiveData(record.content)
     const embedding = await this.embedder.encode(content)
     const expiresAt = this.calculateExpiry(record.type)
+    const id = this.generateId(content, record.type)
 
     const dbRecord: ContextRecord = {
-      id: uuidv4(),
+      id,
       vector: embedding.vector,
       projectId,
       contextType: record.type,
@@ -155,7 +161,7 @@ export class ContextPersister {
     contextType: ContextType,
     sessionId: string,
     projectId: string,
-    metadata?: Record<string, unknown>
+    _metadata?: Record<string, unknown>
   ): Promise<void> {
     if (!this.extractor) return
 
@@ -174,18 +180,12 @@ export class ContextPersister {
     projectId: string
   ): Promise<void> {
     const content = this.redactSensitiveData(metadata.diffSummary)
-    const hash = this.hashContent(content + metadata.filePath)
-
-    if (this.recentHashes.has(hash)) {
-      return
-    }
-    this.recentHashes.add(hash)
-
     const embedding = await this.embedder.encode(content)
     const expiresAt = this.calculateExpiry('file_change')
+    const id = this.generateId(content + metadata.filePath, 'file_change')
 
     const record: ContextRecord = {
-      id: uuidv4(),
+      id,
       vector: embedding.vector,
       projectId,
       contextType: 'file_change',
@@ -208,9 +208,10 @@ export class ContextPersister {
     const content = this.redactSensitiveData(metadata.rationale)
     const embedding = await this.embedder.encode(content)
     const expiresAt = this.calculateExpiry('decision')
+    const id = this.generateId(content, 'decision')
 
     const record: ContextRecord = {
-      id: uuidv4(),
+      id,
       vector: embedding.vector,
       projectId,
       contextType: 'decision',
@@ -233,9 +234,10 @@ export class ContextPersister {
     const content = metadata.blockedReason ?? `Task: ${metadata.taskId}`
     const embedding = await this.embedder.encode(content)
     const expiresAt = this.calculateExpiry('task')
+    const id = this.generateId(content, 'task')
 
     const record: ContextRecord = {
-      id: uuidv4(),
+      id,
       vector: embedding.vector,
       projectId,
       contextType: 'task',
@@ -255,12 +257,13 @@ export class ContextPersister {
     sessionId: string,
     projectId: string
   ): Promise<void> {
-    const content = metadata.commandLine
+    const content = String(metadata.commandLine ?? '')
     const embedding = await this.embedder.encode(content)
     const expiresAt = this.calculateExpiry('command')
+    const id = this.generateId(content, 'command')
 
     const record: ContextRecord = {
-      id: uuidv4(),
+      id,
       vector: embedding.vector,
       projectId,
       contextType: 'command',
@@ -280,16 +283,29 @@ export class ContextPersister {
     sessionId: string,
     projectId: string
   ): Promise<void> {
-    const content = `Technical debt: ${metadata.debtType}`
+    const debtType = typeof metadata?.debtType === 'object' 
+      ? JSON.stringify(metadata.debtType) 
+      : String(metadata?.debtType ?? 'unknown')
+    const severity = typeof metadata?.severity === 'object'
+      ? JSON.stringify(metadata.severity)
+      : String(metadata?.severity ?? 'medium')
+    const content = `Technical debt [${severity}]: ${debtType}`
     const embedding = await this.embedder.encode(content)
+    const id = this.generateId(content, 'debt')
 
     const record: ContextRecord = {
-      id: uuidv4(),
+      id,
       vector: embedding.vector,
       projectId,
       contextType: 'debt',
       content,
-      metadata,
+      metadata: {
+        debtType,
+        severity,
+        introducedIn: metadata?.introducedIn,
+        estimatedEffort: metadata?.estimatedEffort,
+        blockingRelease: metadata?.blockingRelease
+      },
       sessionId,
       createdAt: new Date().toISOString(),
       salience: 0.9
@@ -311,13 +327,7 @@ export class ContextPersister {
   }
 
   hashContent(content: string): string {
-    let hash = 0
-    for (let i = 0; i < content.length; i++) {
-      const char = content.charCodeAt(i)
-      hash = ((hash << 5) - hash) + char
-      hash = hash & hash
-    }
-    return hash.toString(16)
+    return createHash('sha256').update(content).digest('hex').slice(0, 16)
   }
 
   private shouldExclude(filePath: string): boolean {

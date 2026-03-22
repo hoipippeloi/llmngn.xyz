@@ -3,9 +3,7 @@ import type {
   ExtractionResult, 
   LLMMessage,
   ContextType,
-  Severity,
-  TaskStatus,
-  ChangeType
+  Severity
 } from '../types/index.js'
 
 export type ExtractionContext = 'message' | 'error' | 'command_result' | 'file_diff' | 'session_summary'
@@ -250,8 +248,8 @@ export function createSemanticExtractor(llm: LLMProvider, confidenceThreshold?: 
 
 export function extractionResultToContextRecords(
   result: ExtractionResult,
-  sessionId: string,
-  projectId: string,
+  _sessionId: string,
+  _projectId: string,
   contentHash: string
 ): Array<{ type: ContextType; content: string; metadata: Record<string, unknown>; salience: number }> {
   const records: Array<{ type: ContextType; content: string; metadata: Record<string, unknown>; salience: number }> = []

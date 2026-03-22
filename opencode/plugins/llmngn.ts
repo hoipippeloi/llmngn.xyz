@@ -123,7 +123,14 @@ let globalSessionId: string | null = null
 let globalLLMProvider: LLMProviderType | null = null
 let debugLogPath: string | null = null
 
+const DB_OPERATIONS = ['initDatabase', 'insertRecord', 'queryRecords', 'deleteExpired', 'validateSchema', 'extractWithLLM', 'storeExtractedContext']
+
 async function debugLog(message: string, data?: any): Promise<void> {
+  if (!globalConfig?.debug) return
+  
+  const isDbOperation = DB_OPERATIONS.some(op => message.startsWith(op) || message.includes(`:${op}`) || message.includes(op))
+  if (!isDbOperation) return
+
   const timestamp = new Date().toISOString()
   const entry = `[${timestamp}] ${message}${data ? ' ' + JSON.stringify(data, null, 2) : ''}\n`
   
@@ -697,7 +704,7 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
     }
 
     if (globalConfig.llm.enabled) {
-      globalLLMProvider = globalConfig.llm.provider
+      globalLLMProvider = globalConfig.llm.provider as LLMProviderType
       await debugLog("LLM extraction enabled", { provider: globalLLMProvider, model: globalConfig.llm.model })
     }
 

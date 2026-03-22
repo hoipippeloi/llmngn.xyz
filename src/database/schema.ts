@@ -75,9 +75,14 @@ export function fromDBRow(row: Record<string, unknown>): {
   const expiresAt = row[DB_FIELD_NAMES.expiresAt] as number | undefined
   const createdAtVal = row[DB_FIELD_NAMES.createdAt] as number | undefined
   
+  let vector = row[DB_FIELD_NAMES.vector]
+  if (vector && typeof vector === 'object' && !Array.isArray(vector)) {
+    vector = Array.from(vector as unknown as Iterable<number>)
+  }
+  
   return {
     id: row[DB_FIELD_NAMES.id] as string,
-    vector: row[DB_FIELD_NAMES.vector] as number[],
+    vector: vector as number[],
     projectId: row[DB_FIELD_NAMES.projectId] as string,
     contextType: row[DB_FIELD_NAMES.contextType] as string,
     content: row[DB_FIELD_NAMES.content] as string,

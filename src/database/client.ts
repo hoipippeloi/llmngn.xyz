@@ -120,14 +120,22 @@ export class LanceDBClient {
     const results = await query.toArray()
     
     return results
-      .filter((row: unknown) => (row as Record<string, unknown>)['id'] !== '__init__')
+      .filter((row: unknown) => !this.isSystemRecord(row as Record<string, unknown>))
       .map((row: unknown) => this.mapRecord(row as Record<string, unknown>))
+  }
+
+  private isSystemRecord(row: Record<string, unknown>): boolean {
+    const id = row['id'] as string
+    if (id === '__init__' || id === 'init') return true
+    const contextType = row[DB_FIELD_NAMES.contextType] as string
+    const validTypes = ['file_change', 'decision', 'debt', 'task', 'architecture', 'command']
+    return !validTypes.includes(contextType)
   }
 
   private async hasOnlyInitRecord(): Promise<boolean> {
     if (!this.table) return true
     const results = await this.table.query().limit(1).toArray()
-    return results.length === 1 && (results[0] as Record<string, unknown>)['id'] === '__init__'
+    return results.length === 1 && this.isSystemRecord(results[0] as Record<string, unknown>)
   }
 
   async deleteExpired(): Promise<number> {
@@ -165,7 +173,7 @@ export class LanceDBClient {
     }
 
     const r = results[0] as Record<string, unknown>
-    if (r['id'] === '__init__') return null
+    if (this.isSystemRecord(r)) return null
 
     return this.mapRecord(r)
   }
@@ -204,7 +212,7 @@ export class LanceDBClient {
     const results = await query.limit(options.limit ?? 100).toArray()
 
     return results
-      .filter((row: unknown) => (row as Record<string, unknown>)['id'] !== '__init__')
+      .filter((row: unknown) => !this.isSystemRecord(row as Record<string, unknown>))
       .map((row: unknown) => this.mapRecord(row as Record<string, unknown>))
   }
 
@@ -213,10 +221,8 @@ export class LanceDBClient {
       throw new Error('Database not initialized')
     }
 
-    let count = await this.table.countRows()
-    if (count > 0 && await this.hasOnlyInitRecord()) {
-      count = 0
-    }
+    const allRecords = await this.list({ limit: 10000 })
+    const count = allRecords.length
     
     return {
       recordCount: count,

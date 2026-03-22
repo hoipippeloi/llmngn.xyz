@@ -6,7 +6,6 @@ import { ConfigManager } from '../utils/config.js'
 import type { PluginConfig, ContextType, ContextRecord } from '../types/index.js'
 import { readFile, writeFile } from 'fs/promises'
 import { createHash } from 'crypto'
-import { v4 as uuidv4 } from 'uuid'
 import { join } from 'path'
 
 export interface InitOptions {
@@ -200,9 +199,12 @@ This plugin maintains semantic continuity across coding sessions by storing and 
 .lancedb/`
 
     const embedding = await embedder.encode(usageInstructions)
+    const id = createHash('sha256')
+      .update(usageInstructions + 'architecture' + Date.now().toString())
+      .digest('hex').slice(0, 24)
 
     const record: ContextRecord = {
-      id: uuidv4(),
+      id,
       vector: embedding.vector,
       projectId,
       contextType: 'architecture',
@@ -235,6 +237,9 @@ This plugin maintains semantic continuity across coding sessions by storing and 
     const projectId = this.getProjectId()
     const contextType = options.type ?? 'decision'
     const sessionId = options.session ?? `cli-${Date.now()}`
+    const id = createHash('sha256')
+      .update(options.content + contextType + Date.now().toString())
+      .digest('hex').slice(0, 24)
     
     let metadata = {}
     if (options.metadata) {
@@ -246,7 +251,7 @@ This plugin maintains semantic continuity across coding sessions by storing and 
     }
 
     const record: ContextRecord = {
-      id: uuidv4(),
+      id,
       vector: embedding.vector,
       projectId,
       contextType,

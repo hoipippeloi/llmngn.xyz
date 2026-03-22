@@ -1,4 +1,4 @@
-import type { LLMProvider, LLMMessage, LLMResponse, LLMProviderType, LLMConfig } from '../types/index.js'
+import type { LLMProvider, LLMMessage, LLMResponse, LLMConfig } from '../types/index.js'
 
 export class OpenAIProvider implements LLMProvider {
   readonly name = 'openai'

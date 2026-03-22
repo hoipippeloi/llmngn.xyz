@@ -212,7 +212,7 @@ export async function ContextPersistencePlugin(
         const message = input.message as { type?: string; content?: string; role?: string }
         
         if (extractor && message.role === 'assistant' && message.content) {
-          await persister.persistFromLLM(message.content, 'message', currentSessionId, projectId)
+          await persister.persistFromLLM(message.content, 'decision', currentSessionId, projectId)
         } else if (message?.type === 'decision') {
           await persister.persistDecision({
             decisionType: 'pattern',
@@ -256,7 +256,7 @@ export async function ContextPersistencePlugin(
         if (extractor) {
           await persister.persistFromLLM(
             errorMessage,
-            'error',
+            'debt',
             currentSessionId ?? 'unknown',
             projectId,
             { stack: errorObj?.stack }

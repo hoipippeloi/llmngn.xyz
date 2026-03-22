@@ -147,8 +147,12 @@ export class ConfigManager {
         ...(userConfig.filters ?? {})
       },
       llm: {
-        ...DEFAULT_CONFIG.llm,
-        ...(userConfig.llm ?? {})
+        enabled: userConfig.llm?.enabled ?? DEFAULT_CONFIG.llm!.enabled,
+        provider: userConfig.llm?.provider ?? DEFAULT_CONFIG.llm!.provider,
+        model: userConfig.llm?.model ?? DEFAULT_CONFIG.llm!.model,
+        apiKey: userConfig.llm?.apiKey,
+        endpoint: userConfig.llm?.endpoint,
+        extractionConfidenceThreshold: userConfig.llm?.extractionConfidenceThreshold ?? DEFAULT_CONFIG.llm!.extractionConfidenceThreshold
       }
     }
   }

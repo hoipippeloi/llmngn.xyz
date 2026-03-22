@@ -125,7 +125,7 @@ export class LocalEmbeddingProvider implements EmbeddingProvider {
       }
     }
 
-    const vector = this.generateSimpleEmbedding(text)
+    const vector = this.generateEmbedding(text)
     this.cache.set(cacheKey, vector)
     
     return {
@@ -153,26 +153,78 @@ export class LocalEmbeddingProvider implements EmbeddingProvider {
     return hash.toString(16)
   }
 
-  private generateSimpleEmbedding(text: string): number[] {
+  private generateEmbedding(text: string): number[] {
     const vector = new Array(DEFAULT_EMBEDDING_DIMENSION).fill(0)
-    const words = text.toLowerCase().split(/\s+/)
+    const normalized = text.toLowerCase().trim()
     
-    for (const word of words) {
-      const hash = this.simpleHash(word)
-      const index = Math.abs(hash % DEFAULT_EMBEDDING_DIMENSION)
-      vector[index] += 1 / words.length
+    const features = this.extractFeatures(normalized)
+    
+    for (const feature of features) {
+      const positions = this.hashFeature(feature)
+      for (const pos of positions) {
+        vector[pos] += 1
+      }
+    }
+    
+    for (let i = 0; i < 4; i++) {
+      const seed = this.hashString(normalized + i.toString())
+      const idx = Math.abs(seed % DEFAULT_EMBEDDING_DIMENSION)
+      vector[idx] += 0.5
     }
     
     const magnitude = Math.sqrt(vector.reduce((sum, v) => sum + v * v, 0)) || 1
     return vector.map(v => v / magnitude)
   }
 
-  private simpleHash(str: string): number {
-    let hash = 5381
-    for (let i = 0; i < str.length; i++) {
-      hash = ((hash << 5) + hash) + str.charCodeAt(i)
+  private extractFeatures(text: string): string[] {
+    const features: string[] = []
+    
+    const words = text.split(/\s+/).filter(w => w.length > 0)
+    for (const word of words) {
+      features.push(`w:${word}`)
     }
-    return hash
+    
+    for (let i = 0; i < text.length - 2; i++) {
+      features.push(`c:${text.slice(i, i + 3)}`)
+    }
+    
+    for (let i = 0; i < words.length - 1; i++) {
+      features.push(`bw:${words[i]}_${words[i + 1]}`)
+    }
+    
+    return features
+  }
+
+  private hashFeature(feature: string): number[] {
+    const positions: number[] = []
+    
+    for (let i = 0; i < 3; i++) {
+      const hash = this.murmurHash3(feature + i.toString())
+      positions.push(Math.abs(hash) % DEFAULT_EMBEDDING_DIMENSION)
+    }
+    
+    return positions
+  }
+
+  private murmurHash3(str: string): number {
+    let h = 0xdeadbeef
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i)
+      h = Math.imul(h, 0xcc9e2d51)
+      h = (h << 15) | (h >>> 17)
+      h = Math.imul(h, 0x1b873593)
+    }
+    h ^= str.length
+    h ^= h >>> 16
+    h = Math.imul(h, 0x85ebca6b)
+    h ^= h >>> 13
+    h = Math.imul(h, 0xc2b2ae35)
+    h ^= h >>> 16
+    return h >>> 0
+  }
+
+  private hashString(str: string): number {
+    return this.murmurHash3(str)
   }
 
   private estimateTokens(text: string): number {
