@@ -82,7 +82,7 @@ New team member joins:
 
 1. Install LLMNGN:
    ```bash
-   npx degit hoipippeloi/llmngn.xyz/.opencode .opencode && cd .opencode && bun install && cd ..
+   npx degit hoipippeloi/llmngn.xyz/opencode .opencode && cd .opencode && bun install && cd ..
    ```
 
 2. Import team context:

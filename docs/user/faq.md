@@ -7,7 +7,7 @@
 Run this in your project folder:
 
 ```bash
-npx degit hoipippeloi/llmngn.xyz/.opencode .opencode && cd .opencode && bun install && cd ..
+npx degit hoipippeloi/llmngn.xyz/opencode .opencode && cd .opencode && bun install && cd ..
 ```
 
 See [Getting Started](getting-started.md) for details.

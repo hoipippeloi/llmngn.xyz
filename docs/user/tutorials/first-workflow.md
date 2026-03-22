@@ -18,7 +18,7 @@ In this tutorial, you'll learn how to use LLMNGN to maintain context across your
 Open terminal in your project:
 
 ```bash
-npx degit hoipippeloi/llmngn.xyz/.opencode .opencode && cd .opencode && bun install && cd ..
+npx degit hoipippeloi/llmngn.xyz/opencode .opencode && cd .opencode && bun install && cd ..
 ```
 
 Verify:

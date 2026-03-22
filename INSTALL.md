@@ -7,7 +7,7 @@ Context persistence plugin for OpenCode that maintains semantic continuity acros
 Run this in your project directory:
 
 ```bash
-npx degit hoipippeloi/llmngn.xyz/.opencode .opencode && cd .opencode && bun install && cd ..
+npx degit hoipippeloi/llmngn.xyz/opencode .opencode && cd .opencode && bun install && cd ..
 ```
 
 ## Verify

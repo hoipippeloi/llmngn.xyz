@@ -9,6 +9,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initNavScroll();
   initTerminalTyping();
   initCopyButtons();
+  initMobileMenu();
 });
 
 /**
@@ -222,3 +223,27 @@ document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
     }
   });
 });
+
+/**
+ * Mobile menu toggle
+ */
+function initMobileMenu() {
+  const menuBtn = document.querySelector(".mobile-menu-btn");
+  const navLinks = document.querySelector(".nav-links");
+
+  if (!menuBtn || !navLinks) return;
+
+  menuBtn.addEventListener("click", () => {
+    const isActive = menuBtn.classList.toggle("active");
+    navLinks.classList.toggle("active");
+    menuBtn.setAttribute("aria-expanded", isActive);
+  });
+
+  navLinks.querySelectorAll("a").forEach((link) => {
+    link.addEventListener("click", () => {
+      menuBtn.classList.remove("active");
+      navLinks.classList.remove("active");
+      menuBtn.setAttribute("aria-expanded", "false");
+    });
+  });
+}

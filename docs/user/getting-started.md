@@ -13,13 +13,13 @@ LLMNGN is a context persistence plugin for OpenCode that remembers your coding d
 3. Run this command:
 
 ```bash
-npx degit hoipippeloi/llmngn.xyz/.opencode .opencode && cd .opencode && bun install && cd ..
+npx degit hoipippeloi/llmngn.xyz/opencode .opencode && cd .opencode && bun install && cd ..
 ```
 
 **For PowerShell users:**
 
 ```powershell
-npx degit hoipippeloi/llmngn.xyz/.opencode .opencode; cd .opencode; bun install; cd ..
+npx degit hoipippeloi/llmngn.xyz/opencode .opencode; cd .opencode; bun install; cd ..
 ```
 
 This installs:

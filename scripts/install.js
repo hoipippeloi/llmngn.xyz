@@ -8,10 +8,10 @@ const REPO = 'hoipippeloi/llmngn.xyz'
 const BRANCH = 'main'
 
 const FILES = [
-  '.opencode/plugins/llmngn.ts',
-  '.opencode/plugins/llmngn.json',
-  '.opencode/package.json',
-  '.opencode/commands/llmngn.md',
+  'opencode/plugins/llmngn.ts',
+  'opencode/plugins/llmngn.json',
+  'opencode/package.json',
+  'opencode/commands/llmngn.md',
   'LLMNGN.md'
 ]
 

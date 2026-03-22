@@ -1,7 +1,0 @@
-{
-  "dependencies": {
-    "@opencode-ai/plugin": "1.2.27",
-    "@lancedb/lancedb": "^0.4.0",
-    "uuid": "^9.0.0"
-  }
-}

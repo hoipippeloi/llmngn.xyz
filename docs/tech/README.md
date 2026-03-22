@@ -40,7 +40,7 @@ LLMNGN (pronounced "llm engine") solves a fundamental problem in AI-assisted dev
 ### Installation
 
 ```bash
-npx degit hoipippeloi/llmngn.xyz/.opencode .opencode && cd .opencode && bun install && cd ..
+npx degit hoipippeloi/llmngn.xyz/opencode .opencode && cd .opencode && bun install && cd ..
 ```
 
 ### Verify Installation
