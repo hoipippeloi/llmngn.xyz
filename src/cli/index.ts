@@ -627,6 +627,8 @@ export function createProgram(cli: CLI): Command {
         id: r.id,
         type: r.contextType,
         content: r.content.slice(0, 100),
+        context: r.context?.slice(0, 200),
+        metadata: r.metadata,
         session: r.sessionId,
         created: r.createdAt
       })), null, 2))

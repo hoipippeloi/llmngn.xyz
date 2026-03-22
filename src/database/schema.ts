@@ -6,6 +6,7 @@ export const DB_FIELD_NAMES = {
   projectId: 'project_id',
   contextType: 'context_type',
   content: 'content',
+  context: 'context',
   metadata: 'metadata',
   sessionId: 'session_id',
   createdAt: 'created_at',
@@ -23,6 +24,7 @@ export interface DBRow extends Record<string, unknown> {
   project_id: string
   context_type: string
   content: string
+  context?: string
   metadata: string
   session_id: string
   created_at: number
@@ -36,6 +38,7 @@ export interface RecordInput {
   projectId: string
   contextType: string
   content: string
+  context?: string
   metadata: Record<string, unknown> | string
   sessionId: string
   createdAt: string | number
@@ -50,6 +53,7 @@ export function toDBRow(record: RecordInput): Record<string, unknown> {
     project_id: record.projectId,
     context_type: record.contextType,
     content: record.content,
+    context: record.context ?? '',
     metadata: typeof record.metadata === 'string' ? record.metadata : JSON.stringify(record.metadata),
     session_id: record.sessionId,
     created_at: typeof record.createdAt === 'number' ? record.createdAt : new Date(record.createdAt).getTime(),
@@ -66,6 +70,7 @@ export function fromDBRow(row: Record<string, unknown>): {
   projectId: string
   contextType: string
   content: string
+  context?: string
   metadata: Record<string, unknown>
   sessionId: string
   createdAt: string
@@ -74,6 +79,7 @@ export function fromDBRow(row: Record<string, unknown>): {
 } {
   const expiresAt = row[DB_FIELD_NAMES.expiresAt] as number | undefined
   const createdAtVal = row[DB_FIELD_NAMES.createdAt] as number | undefined
+  const contextVal = row[DB_FIELD_NAMES.context] as string | undefined
   
   let vector = row[DB_FIELD_NAMES.vector]
   if (vector && typeof vector === 'object' && !Array.isArray(vector)) {
@@ -86,6 +92,7 @@ export function fromDBRow(row: Record<string, unknown>): {
     projectId: row[DB_FIELD_NAMES.projectId] as string,
     contextType: row[DB_FIELD_NAMES.contextType] as string,
     content: row[DB_FIELD_NAMES.content] as string,
+    context: contextVal && contextVal.length > 0 ? contextVal : undefined,
     metadata: JSON.parse(row[DB_FIELD_NAMES.metadata] as string || '{}'),
     sessionId: row[DB_FIELD_NAMES.sessionId] as string,
     createdAt: createdAtVal ? new Date(createdAtVal).toISOString() : new Date().toISOString(),

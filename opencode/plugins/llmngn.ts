@@ -112,7 +112,7 @@ const DEFAULT_CONFIG = {
   salienceDecay: 0.95,
   retentionDays: 90,
   debug: true,
-  contextTypes: ["file_change", "decision", "debt", "task", "architecture", "command", "completion"],
+  contextTypes: ["file_change", "decision", "debt", "task", "architecture", "completion"],
   weights: { file_change: 0.8, decision: 1, debt: 0.9, task: 0.7, architecture: 1, command: 0.5, completion: 0.85 },
   filters: {
     excludePatterns: ["**/node_modules/**", "**/dist/**", "**/.git/**", "**/build/**", "**/*.min.js", "**/.env*", "**/package-lock.json"],
@@ -943,10 +943,6 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
             await persistContext(globalDb, f.changes, "file_change", globalSessionId, globalProjectId, { filePath: f.filePath })
           }
 
-          for (const cmd of sessionData.commands) {
-            await persistContext(globalDb, cmd.command, "command", globalSessionId, globalProjectId, { exitCode: cmd.exitCode, duration: cmd.duration })
-          }
-
           for (const d of sessionData.decisions) {
             await persistContext(globalDb, d.content, "decision", globalSessionId, globalProjectId, { rationale: d.rationale })
           }
@@ -1047,6 +1043,9 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
       if (shouldExclude(input.filePath)) return
 
       const content = String(input.changes ?? `File modified: ${input.filePath}`)
+      const contextRaw = input.reasoning || input.context || ''
+      const maxContextChars = 120
+      const context = contextRaw.length > maxContextChars ? contextRaw.slice(0, maxContextChars) : contextRaw || undefined
       
       sessionData.filesEdited.push({ filePath: input.filePath, changes: content })
 
@@ -1069,7 +1068,9 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
       await persistContext(
         globalDb, content, "file_change",
         globalSessionId, globalProjectId,
-        { filePath: input.filePath }
+        { filePath: input.filePath },
+        undefined,
+        context
       )
     },
 
@@ -1085,12 +1086,6 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
         exitCode: result?.exitCode ?? 0,
         duration: result?.duration ?? 0
       })
-
-      await persistContext(
-        globalDb, input.command, "command",
-        globalSessionId, globalProjectId,
-        { exitCode: result?.exitCode, duration: result?.duration }
-      )
     },
 
     "message.updated": async (input: any) => {
@@ -1165,11 +1160,6 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
         const command = output?.args?.command || input?.args?.command
         if (command && !sessionData.commands.some(c => c.command === command)) {
           sessionData.commands.push({ command: String(command), exitCode: 0, duration: 0 })
-          await persistContext(
-            globalDb, String(command), "command",
-            effectiveSessionId, globalProjectId,
-            { tool: "bash" }
-          )
         }
       }
 
@@ -1283,10 +1273,6 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
               for (const f of sessionData.filesEdited) {
                 if (shouldExclude(f.filePath)) continue
                 await persistContext(globalDb, f.changes, "file_change", globalSessionId, globalProjectId, { filePath: f.filePath })
-              }
-
-              for (const cmd of sessionData.commands) {
-                await persistContext(globalDb, cmd.command, "command", globalSessionId, globalProjectId, { exitCode: cmd.exitCode, duration: cmd.duration })
               }
 
               for (const d of sessionData.decisions) {
@@ -1436,6 +1422,9 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
 
           const effectiveSessionId = globalSessionId || `session-${Date.now()}`
           const content = props?.changes || `File modified: ${filePath}`
+          const contextRaw = props?.reasoning || props?.context || ''
+          const maxContextChars = 120
+          const context = contextRaw.length > maxContextChars ? contextRaw.slice(0, maxContextChars) : contextRaw || undefined
 
           if (!sessionData.filesEdited.some(f => f.filePath === filePath)) {
             sessionData.filesEdited.push({ filePath, changes: content })
@@ -1457,7 +1446,7 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
             }
           }
 
-          await persistContext(globalDb, content, "file_change", effectiveSessionId, globalProjectId, { filePath })
+          await persistContext(globalDb, content, "file_change", effectiveSessionId, globalProjectId, { filePath }, undefined, context)
           break
         }
 
@@ -1479,8 +1468,6 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
           if (!sessionData.commands.some(c => c.command === command)) {
             sessionData.commands.push({ command, exitCode: props?.exitCode ?? 0, duration: props?.duration ?? 0 })
           }
-
-          await persistContext(globalDb, command, "command", effectiveSessionId, globalProjectId, { exitCode: props?.exitCode, duration: props?.duration })
           break
         }
 

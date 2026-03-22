@@ -96,6 +96,7 @@ export interface ContextRecord {
   projectId: string
   contextType: ContextType
   content: string
+  context?: string
   metadata: ContextMetadata
   sessionId: string
   createdAt: string
