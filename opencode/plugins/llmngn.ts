@@ -1394,11 +1394,14 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
               if (completion) {
                 await debugLog("event:message.updated: detected completion", completion)
                 sessionData.completions.push({ ...completion, message: content })
+                const completionIndex = sessionData.completions.length
+                const completionContext = `${completionIndex}x ${completion.action}: ${completion.target}`
                 await persistContext(
                   globalDb, completion.shorthand, "completion",
                   effectiveSessionId, globalProjectId,
                   { action: completion.action, target: completion.target },
-                  0.85
+                  0.85,
+                  completionContext
                 )
               }
             }
@@ -1430,6 +1433,12 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
             sessionData.filesEdited.push({ filePath, changes: content })
           }
 
+          const fileEditCount = sessionData.filesEdited.filter(f => f.filePath === filePath).length
+          let generatedContext: string | undefined
+          if (fileEditCount > 1) {
+            generatedContext = `${fileEditCount}x edits to this file`
+          }
+
           if (globalConfig?.llm?.enabled) {
             const extraction = await extractWithLLM(content, 'file_diff')
             if (extraction) {
@@ -1446,7 +1455,7 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
             }
           }
 
-          await persistContext(globalDb, content, "file_change", effectiveSessionId, globalProjectId, { filePath }, undefined, context)
+          await persistContext(globalDb, content, "file_change", effectiveSessionId, globalProjectId, { filePath }, undefined, context || generatedContext)
           break
         }
 

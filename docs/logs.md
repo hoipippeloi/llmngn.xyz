@@ -11,7 +11,7 @@ Plugin: `opencode/plugins/llmngn.ts` | Storage: LanceDB | Table: `llmngn_context
 | `project_id` | string | Project (directory basename) |
 | `context_type` | string | Record type |
 | `content` | string | Primary text |
-| `context` | string | Optional agent reasoning (~30 tokens) |
+| `context` | string | Optional agent reasoning |
 | `metadata` | string | JSON metadata |
 | `session_id` | string | Session identifier |
 | `created_at` | number | Timestamp (ms) |
@@ -21,33 +21,52 @@ Plugin: `opencode/plugins/llmngn.ts` | Storage: LanceDB | Table: `llmngn_context
 ## Context Types
 
 | Type | When | Salience | Retention |
-|------|------|----------|------------|
+|------|------|----------|-----------|
 | `decision` | Architectural choices | 1.0 | 180d |
 | `architecture` | System design | 1.0 | 365d |
 | `file_change` | File edits | 0.8 | 90d |
 | `debt` | Errors/tech debt | 0.9 | 90d |
 | `completion` | Finished work | 0.85 | 60d |
 | `task` | Task tracking | 0.7 | 60d |
+| `command` | Shell commands | 0.5 | 30d |
 
 ## Hooks
 
 | Hook | Action |
 |------|--------|
-| `session.created` | Set session ID, query DB for context |
-| `session.idle` | Persist session data with agent reasoning in `context` field |
+| `experimental.chat.system.transform` | Inject context into system prompt (read only) |
+| `session.created` | Set session ID |
+| `session.idle` | Persist session data, delete expired |
 | `session.error` | Store as `debt` |
-| `file.edited` | Store as `file_change` with reasoning |
+| `file.edited` | Store as `file_change` |
+| `command.executed` | Store as `command` |
 | `message.updated` | Detect completions, decisions |
 | `todo.updated` | Store as `task` |
+| `tool.execute.after` | Capture bash/write/edit tool usage |
+| `experimental.session.compacting` | Preserve persistent context (read only) |
 
 ## Flow
 
 ```
-session.created → Query DB → Inject context into prompt
-         ↓
-file.edited → persistContext("file_change", {...}, context)
-message.updated → detectCompletion() → persistContext()
-session.idle → Persist summary with chatContext in context field
+┌─ SESSION START ─────────────────────────────────────────────────┐
+│  session.created → Set session ID                                │
+│  system.transform → Query DB → Inject context into system prompt │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─ DURING SESSION ────────────────────────────────────────────────┐
+│  file.edited → persistContext("file_change")                     │
+│  command.executed → persistContext("command")                    │
+│  message.updated → detectCompletion() → persistContext()         │
+│  todo.updated → persistContext("task")                           │
+│  session.error → persistContext("debt")                          │
+│  tool.execute.after → persistContext for bash/write/edit         │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─ SESSION IDLE ──────────────────────────────────────────────────┐
+│  LLM enabled: extractWithLLM(session_summary)                    │
+│  LLM disabled: Direct persist sessionData                        │
+│  deleteExpired() cleanup → Reset sessionData                     │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ## Completion Detection
@@ -56,13 +75,13 @@ Patterns: `fixed` (✓), `created` (+), `implemented` (★), `refactored` (↻),
 
 Triggers: done, complete, finished, fixed, created, implemented, resolved, updated, refactored
 
-Output: `{symbol} {action}: {target}` → stored in `content`; agent reasoning in `context`
+Output: `{symbol} {action}: {target}` (e.g., `✓ fixed: auth.ts`)
 
 ## LLM Extraction
 
 When `llm.enabled: true`, extracts structured context via LLM.
 
-Contexts: `message`, `error`, `file_diff`, `session_summary`, `completion`
+Contexts: `message`, `error`, `command_result`, `file_diff`, `session_summary`, `completion`
 
 Threshold: 0.7 confidence | Providers: `openai`, `anthropic`, `ollama`, `local`
 
@@ -88,8 +107,29 @@ File: `.opencode/plugins/llmngn.json`
   "embeddingProvider": "local",
   "lancedbPath": ".lancedb",
   "maxContextTokens": 4096,
-  "contextTypes": ["file_change", "decision", "debt", "task", "architecture", "completion"],
-  "llm": { "enabled": false }
+  "salienceDecay": 0.95,
+  "retentionDays": 180,
+  "debug": true,
+  "contextTypes": ["file_change", "decision", "debt", "task", "architecture", "command", "completion"],
+  "weights": {
+    "file_change": 0.8,
+    "decision": 1,
+    "debt": 0.9,
+    "task": 0.7,
+    "architecture": 1,
+    "command": 0.5,
+    "completion": 0.85
+  },
+  "filters": {
+    "excludePatterns": ["**/node_modules/**", "**/dist/**", "**/.git/**", "**/build/**", "**/*.min.js", "**/.env*", "**/package-lock.json"],
+    "sensitiveDataRedaction": true
+  },
+  "llm": {
+    "enabled": false,
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "extractionConfidenceThreshold": 0.7
+  }
 }
 ```
 
@@ -97,22 +137,32 @@ File: `.opencode/plugins/llmngn.json`
 
 | Function | Purpose |
 |----------|---------|
-| `persistContext(content, type, session, project, metadata, salience, context)` | Store record with agent reasoning |
+| `loadConfig()` | Load user config with defaults |
+| `redactSensitive()` | Apply redaction patterns |
+| `shouldExclude()` | Check file against exclusion patterns |
+| `initDatabase()` | Connect to LanceDB |
+| `insertRecord()` | Insert context record |
 | `queryRecords()` | Retrieve by project |
+| `deleteExpired()` | Remove expired records |
+| `persistContext()` | Main function to store context |
+| `llmComplete()` | Call LLM provider API |
+| `llmExtractStructured()` | Extract structured data from LLM |
+| `extractWithLLM()` | Extract context using LLM |
+| `storeExtractedContext()` | Store extracted context to DB |
 | `detectCompletion()` | Pattern-based completion detection |
-| `extractWithLLM()` | LLM-based structured extraction |
 
 ## Session Data
 
 ```typescript
 interface SessionData {
   sessionId: string
-  filesEdited: Array<{ filePath, changes }>
-  commands: Array<{ command, exitCode, duration }>  // in-memory only, not persisted
-  decisions: Array<{ content, rationale? }>
-  tasks: Array<{ content, status }>
-  errors: Array<{ error, context? }>
-  completions: Array<{ shorthand, action, target, message }>
+  startTime: string
+  filesEdited: Array<{ filePath: string; changes: string }>
+  commands: Array<{ command: string; exitCode: number; duration: number }>
+  decisions: Array<{ content: string; rationale?: string }>
+  tasks: Array<{ content: string; status: string }>
+  errors: Array<{ error: string; context?: string }>
+  completions: Array<{ shorthand: string; action: string; target: string; message: string }>
 }
 ```
 
@@ -120,4 +170,4 @@ interface SessionData {
 
 `debug: true` → `.opencode/plugins/llmngn-debug.log`
 
-Operations: `initDatabase`, `insertRecord`, `queryRecords`, `deleteExpired`, `validateSchema`
+Operations: `initDatabase`, `insertRecord`, `queryRecords`, `deleteExpired`, `validateSchema`, `extractWithLLM`, `storeExtractedContext`
