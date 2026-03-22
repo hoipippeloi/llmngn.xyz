@@ -35,5 +35,11 @@
     ],
     "sensitiveDataRedaction": true
   },
+  "llm": {
+    "enabled": false,
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "extractionConfidenceThreshold": 0.7
+  },
   "debug": true
 }
