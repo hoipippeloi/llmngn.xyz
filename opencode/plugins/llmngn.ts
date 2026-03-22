@@ -966,6 +966,7 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
         if (hasCompletions || hasFileEdits) {
           let completionSummary: string
           let metadata: Record<string, unknown>
+          let chatContext: string | undefined
           
           if (hasCompletions) {
             const uniqueTargets = [...new Set(sessionData.completions.map(c => c.target))].slice(0, 5)
@@ -980,14 +981,13 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
             const uniqueFiles = [...new Set([...relatedFiles, ...sessionData.completions.filter(c=>c.target!=='unknown').map(c=>c.target!)])].slice(0, 5)
             
             completionSummary = `session: ${actionSummary} → ${uniqueTargets.join(', ')}`
-            const chatContext = sessionData.completions.map(c => c.message).filter(Boolean).join(' | ').slice(0, 500)
+            chatContext = sessionData.completions.map(c => c.message).filter(Boolean).join(' | ').slice(0, 500)
             
             metadata = { 
               count: sessionData.completions.length,
               actions: actionCounts,
               targets: uniqueTargets,
-              files: uniqueFiles,
-              context: chatContext
+              files: uniqueFiles
             }
           } else {
             const uniqueFiles = [...new Set(sessionData.filesEdited.map(f => f.filePath))].slice(0, 5)
@@ -1002,7 +1002,7 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
             }
           }
           
-          await persistContext(globalDb, completionSummary, "completion", globalSessionId, globalProjectId, metadata, 0.85)
+          await persistContext(globalDb, completionSummary, "completion", globalSessionId, globalProjectId, metadata, 0.85, chatContext)
           await debugLog("session.idle: persisted completion", { summary: completionSummary })
         }
 
@@ -1308,6 +1308,7 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
             if (hasCompletions || hasFileEdits) {
               let completionSummary: string
               let metadata: Record<string, unknown>
+              let chatContext: string | undefined
               
               if (hasCompletions) {
                 const uniqueTargets = [...new Set(sessionData.completions.map(c => c.target))].slice(0, 5)
@@ -1322,14 +1323,13 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
                 const uniqueFiles = [...new Set([...relatedFiles, ...sessionData.completions.filter(c=>c.target!=='unknown').map(c=>c.target!)])].slice(0, 5)
                 
                 completionSummary = `session: ${actionSummary} → ${uniqueTargets.join(', ')}`
-                const chatContext = sessionData.completions.map(c => c.message).filter(Boolean).join(' | ').slice(0, 500)
+                chatContext = sessionData.completions.map(c => c.message).filter(Boolean).join(' | ').slice(0, 500)
                 
                 metadata = { 
                   count: sessionData.completions.length,
                   actions: actionCounts,
                   targets: uniqueTargets,
-                  files: uniqueFiles,
-                  context: chatContext
+                  files: uniqueFiles
                 }
               } else {
                 const uniqueFiles = [...new Set(sessionData.filesEdited.map(f => f.filePath))].slice(0, 5)
@@ -1344,7 +1344,7 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
                 }
               }
               
-              await persistContext(globalDb, completionSummary, "completion", globalSessionId, globalProjectId, metadata, 0.85)
+              await persistContext(globalDb, completionSummary, "completion", globalSessionId, globalProjectId, metadata, 0.85, chatContext)
               await debugLog("event:session.idle: persisted completion", { summary: completionSummary })
             }
 
