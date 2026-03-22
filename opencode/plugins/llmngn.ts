@@ -952,28 +952,50 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
           }
         }
 
-        if (sessionData.completions.length > 0) {
-          const uniqueTargets = [...new Set(sessionData.completions.map(c => c.target))].slice(0, 5)
-          const actions = sessionData.completions.map(c => c.action)
-          const actionCounts: Record<string, number> = {}
-          for (const a of actions) actionCounts[a] = (actionCounts[a] || 0) + 1
-          const actionSummary = Object.entries(actionCounts).map(([a, n]) => n > 1 ? `${n}x ${a}` : a).join(', ')
+        const hasCompletions = sessionData.completions.length > 0
+        const hasFileEdits = sessionData.filesEdited.length > 0
+        
+        if (hasCompletions || hasFileEdits) {
+          let completionSummary: string
+          let metadata: Record<string, unknown>
           
-          const relatedFiles = sessionData.filesEdited.filter(f => 
-            sessionData.completions.some(c => c.target && f.filePath.includes(c.target))
-          ).map(f => f.filePath)
-          const uniqueFiles = [...new Set([...relatedFiles, ...sessionData.completions.filter(c=>c.target!=='unknown').map(c=>c.target!)])].slice(0, 5)
+          if (hasCompletions) {
+            const uniqueTargets = [...new Set(sessionData.completions.map(c => c.target))].slice(0, 5)
+            const actions = sessionData.completions.map(c => c.action)
+            const actionCounts: Record<string, number> = {}
+            for (const a of actions) actionCounts[a] = (actionCounts[a] || 0) + 1
+            const actionSummary = Object.entries(actionCounts).map(([a, n]) => n > 1 ? `${n}x ${a}` : a).join(', ')
+            
+            const relatedFiles = sessionData.filesEdited.filter(f => 
+              sessionData.completions.some(c => c.target && f.filePath.includes(c.target))
+            ).map(f => f.filePath)
+            const uniqueFiles = [...new Set([...relatedFiles, ...sessionData.completions.filter(c=>c.target!=='unknown').map(c=>c.target!)])].slice(0, 5)
+            
+            completionSummary = `session: ${actionSummary} → ${uniqueTargets.join(', ')}`
+            const chatContext = sessionData.completions.map(c => c.message).filter(Boolean).join(' | ').slice(0, 500)
+            
+            metadata = { 
+              count: sessionData.completions.length,
+              actions: actionCounts,
+              targets: uniqueTargets,
+              files: uniqueFiles,
+              context: chatContext
+            }
+          } else {
+            const uniqueFiles = [...new Set(sessionData.filesEdited.map(f => f.filePath))].slice(0, 5)
+            const fileSummary = uniqueFiles.length === 1 
+              ? uniqueFiles[0] 
+              : `${uniqueFiles.length} files`
+            completionSummary = `session: edited ${fileSummary}`
+            metadata = {
+              count: sessionData.filesEdited.length,
+              files: uniqueFiles,
+              commands: sessionData.commands.length
+            }
+          }
           
-          const completionSummary = `session: ${actionSummary} → ${uniqueTargets.join(', ')}`
-          const chatContext = sessionData.completions.map(c => c.message).filter(Boolean).join(' | ').slice(0, 500)
-          
-          await persistContext(globalDb, completionSummary, "completion", globalSessionId, globalProjectId, { 
-            count: sessionData.completions.length,
-            actions: actionCounts,
-            targets: uniqueTargets,
-            files: uniqueFiles,
-            context: chatContext
-          }, 0.9)
+          await persistContext(globalDb, completionSummary, "completion", globalSessionId, globalProjectId, metadata, 0.85)
+          await debugLog("session.idle: persisted completion", { summary: completionSummary })
         }
 
         await deleteExpired(globalDb)
@@ -1144,15 +1166,26 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
       }
 
       if (toolName === "write" || toolName === "edit") {
-        const filePath = output?.args?.filePath || input?.args?.filePath
+        const filePath = input?.params?.filePath || input?.args?.filePath || output?.args?.filePath || input?.filePath || output?.filePath
+        await debugLog("tool.execute.after: write/edit", { 
+          toolName, 
+          filePath, 
+          inputKeys: input ? Object.keys(input) : [],
+          outputKeys: output ? Object.keys(output) : [],
+          inputParams: input?.params,
+          inputArgs: input?.args
+        })
+        
         if (filePath && !shouldExclude(filePath) && !sessionData.filesEdited.some(f => f.filePath === filePath)) {
-          const changes = input?.changes || `File ${toolName === 'write' ? 'created' : 'edited'}`
+          const changes = input?.changes || input?.params?.content?.substring(0, 200) || `File ${toolName === 'write' ? 'created' : 'edited'}`
           sessionData.filesEdited.push({ filePath, changes })
           await persistContext(
             globalDb, changes, "file_change",
             effectiveSessionId, globalProjectId,
             { filePath, changeType: toolName === 'write' ? 'create' : 'modify' }
           )
+        } else if (!filePath) {
+          await debugLog("tool.execute.after: write/edit - NO FILEPATH FOUND", { toolName })
         }
       }
     },
@@ -1261,28 +1294,50 @@ export default async ({ project, client, directory }: Parameters<Plugin>[0]) => 
               }
             }
 
-            if (sessionData.completions.length > 0) {
-              const uniqueTargets = [...new Set(sessionData.completions.map(c => c.target))].slice(0, 5)
-              const actions = sessionData.completions.map(c => c.action)
-              const actionCounts: Record<string, number> = {}
-              for (const a of actions) actionCounts[a] = (actionCounts[a] || 0) + 1
-              const actionSummary = Object.entries(actionCounts).map(([a, n]) => n > 1 ? `${n}x ${a}` : a).join(', ')
+            const hasCompletions = sessionData.completions.length > 0
+            const hasFileEdits = sessionData.filesEdited.length > 0
+            
+            if (hasCompletions || hasFileEdits) {
+              let completionSummary: string
+              let metadata: Record<string, unknown>
               
-              const relatedFiles = sessionData.filesEdited.filter(f => 
-                sessionData.completions.some(c => c.target && f.filePath.includes(c.target))
-              ).map(f => f.filePath)
-              const uniqueFiles = [...new Set([...relatedFiles, ...sessionData.completions.filter(c=>c.target!=='unknown').map(c=>c.target!)])].slice(0, 5)
+              if (hasCompletions) {
+                const uniqueTargets = [...new Set(sessionData.completions.map(c => c.target))].slice(0, 5)
+                const actions = sessionData.completions.map(c => c.action)
+                const actionCounts: Record<string, number> = {}
+                for (const a of actions) actionCounts[a] = (actionCounts[a] || 0) + 1
+                const actionSummary = Object.entries(actionCounts).map(([a, n]) => n > 1 ? `${n}x ${a}` : a).join(', ')
+                
+                const relatedFiles = sessionData.filesEdited.filter(f => 
+                  sessionData.completions.some(c => c.target && f.filePath.includes(c.target))
+                ).map(f => f.filePath)
+                const uniqueFiles = [...new Set([...relatedFiles, ...sessionData.completions.filter(c=>c.target!=='unknown').map(c=>c.target!)])].slice(0, 5)
+                
+                completionSummary = `session: ${actionSummary} → ${uniqueTargets.join(', ')}`
+                const chatContext = sessionData.completions.map(c => c.message).filter(Boolean).join(' | ').slice(0, 500)
+                
+                metadata = { 
+                  count: sessionData.completions.length,
+                  actions: actionCounts,
+                  targets: uniqueTargets,
+                  files: uniqueFiles,
+                  context: chatContext
+                }
+              } else {
+                const uniqueFiles = [...new Set(sessionData.filesEdited.map(f => f.filePath))].slice(0, 5)
+                const fileSummary = uniqueFiles.length === 1 
+                  ? uniqueFiles[0] 
+                  : `${uniqueFiles.length} files`
+                completionSummary = `session: edited ${fileSummary}`
+                metadata = {
+                  count: sessionData.filesEdited.length,
+                  files: uniqueFiles,
+                  commands: sessionData.commands.length
+                }
+              }
               
-              const completionSummary = `session: ${actionSummary} → ${uniqueTargets.join(', ')}`
-              const chatContext = sessionData.completions.map(c => c.message).filter(Boolean).join(' | ').slice(0, 500)
-              
-              await persistContext(globalDb, completionSummary, "completion", globalSessionId, globalProjectId, { 
-                count: sessionData.completions.length,
-                actions: actionCounts,
-                targets: uniqueTargets,
-                files: uniqueFiles,
-                context: chatContext
-              }, 0.9)
+              await persistContext(globalDb, completionSummary, "completion", globalSessionId, globalProjectId, metadata, 0.85)
+              await debugLog("event:session.idle: persisted completion", { summary: completionSummary })
             }
 
             await deleteExpired(globalDb)
